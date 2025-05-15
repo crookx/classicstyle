@@ -1,6 +1,6 @@
 
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -26,7 +26,7 @@ const signupSchema = z.object({
   confirmPassword: z.string().min(6, {message: "Password must be at least 6 characters."})
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
-  path: ["confirmPassword"],
+  path: ["confirmPassword"], // This targets the confirmPassword field for the error message
 });
 
 
@@ -42,7 +42,7 @@ export default function LoginPage() {
 
   const [isLoginView, setIsLoginView] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false); // Unified submitting state
 
 
   const loginForm = useForm<LoginFormValues>({
@@ -55,13 +55,21 @@ export default function LoginPage() {
     defaultValues: { email: '', password: '', confirmPassword: '' },
   });
 
+  useEffect(() => {
+    // If user is already logged in and not in authLoading state, redirect.
+    if (!authLoading && currentUser) {
+      router.push(redirectPath);
+    }
+  }, [currentUser, authLoading, router, redirectPath]);
+
+
   async function onLoginSubmit(values: LoginFormValues) {
     setAuthError(null);
     setIsSubmitting(true);
     try {
       await login(values.email, values.password);
       toast({ title: "Login Successful!", description: "Welcome back." });
-      router.push(redirectPath);
+      // router.push(redirectPath); // Let useEffect handle redirect
     } catch (error: any) {
       handleAuthError(error, "Login Failed");
     } finally {
@@ -78,7 +86,7 @@ export default function LoginPage() {
       setIsLoginView(true); 
       loginForm.setValue('email', values.email); 
       loginForm.resetField('password');
-      signupForm.reset();
+      signupForm.reset(); // Reset signup form fully
     } catch (error: any) {
       handleAuthError(error, "Signup Failed");
     } finally {
@@ -109,30 +117,30 @@ export default function LoginPage() {
       }
     }
     setAuthError(message);
-    toast({ title: type, description: message, variant: "destructive" });
+    // toast({ title: type, description: message, variant: "destructive" }); // Error is shown inline now
   }
 
-  if (authLoading) {
+  if (authLoading && !currentUser) { // Show loader if auth is loading and no user yet
     return (
-      <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+        <p className="text-lg text-muted-foreground">Loading authentication...</p>
       </div>
     );
   }
 
-  if (currentUser) {
-    router.push(redirectPath); 
+  if (!authLoading && currentUser) { // Show redirecting if user exists and not loading
     return (
-        <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
-            <Loader2 className="h-12 w-12 animate-spin text-primary" />
-            <p className="ml-4 text-lg">Redirecting...</p>
+        <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
+            <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+            <p className="text-lg text-muted-foreground">Redirecting...</p>
         </div>
     );
   }
 
 
   return (
-    <div className="flex items-center justify-center py-12">
+    <div className="flex items-center justify-center py-12 px-4">
       <Card className="w-full max-w-md shadow-xl rounded-xl">
         <CardHeader className="text-center">
           <CardTitle className="text-3xl font-serif">{isLoginView ? "Welcome Back" : "Create Account"}</CardTitle>
@@ -149,7 +157,7 @@ export default function LoginPage() {
                     <FormItem>
                       <FormLabel>Email</FormLabel>
                       <FormControl>
-                        <Input placeholder="you@example.com" {...field} />
+                        <Input type="email" placeholder="you@example.com" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -176,6 +184,7 @@ export default function LoginPage() {
               </form>
             </Form>
           ) : (
+            // Signup Form
             <Form {...signupForm}>
               <form onSubmit={signupForm.handleSubmit(onSignupSubmit)} className="space-y-6">
                 <FormField
@@ -185,7 +194,7 @@ export default function LoginPage() {
                     <FormItem>
                       <FormLabel>Email</FormLabel>
                       <FormControl>
-                        <Input placeholder="you@example.com" {...field} />
+                        <Input type="email" placeholder="you@example.com" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -230,10 +239,11 @@ export default function LoginPage() {
            <Separator className="my-4" />
            <Button variant="link" onClick={() => {
              setIsLoginView(!isLoginView);
-             setAuthError(null);
+             setAuthError(null); // Clear any previous errors
+             // Reset forms when switching views
              loginForm.reset({ email: '', password: '' }); 
              signupForm.reset({ email: '', password: '', confirmPassword: '' });
-             setIsSubmitting(false);
+             setIsSubmitting(false); // Reset submitting state
             }}>
             {isLoginView ? "Don't have an account? Sign Up" : "Already have an account? Log In"}
           </Button>

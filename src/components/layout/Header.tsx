@@ -6,11 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Heart, ShoppingCart, User, Search, Menu, LogIn, LogOut } from 'lucide-react';
 import { useCart } from '@/contexts/CartContext';
 import { useWishlist } from '@/contexts/WishlistContext';
-import { useAuth } from '@/contexts/AuthContext'; // Added
+import { useAuth } from '@/contexts/AuthContext';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
+import { Separator } from '@/components/ui/separator';
 
 const navLinks = [
   { href: '/', label: 'Home' },
@@ -21,7 +22,7 @@ const navLinks = [
 export default function Header() {
   const { cart } = useCart();
   const { wishlist } = useWishlist();
-  const { currentUser, logout, loading } = useAuth(); // Added currentUser, logout, loading
+  const { currentUser, logout, loading } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -33,6 +34,7 @@ export default function Header() {
     try {
       await logout();
       toast({ title: 'Logged Out', description: 'You have been successfully logged out.' });
+      setMobileMenuOpen(false);
       router.push('/');
     } catch (error) {
       toast({ title: 'Logout Failed', description: 'Could not log out. Please try again.', variant: 'destructive' });
@@ -54,13 +56,14 @@ export default function Header() {
             </Link>
           ))}
         </nav>
-        <div className="flex items-center space-x-3 md:space-x-4">
-          <Button variant="ghost" size="icon" className="hover:bg-accent/50">
+        <div className="flex items-center space-x-1 md:space-x-2">
+          {/* Desktop Icons */}
+          <Button variant="ghost" size="icon" className="hidden md:inline-flex hover:bg-accent/50">
             <Search className="h-5 w-5" />
             <span className="sr-only">Search</span>
           </Button>
-          <Link href="/wishlist" passHref>
-            <Button variant="ghost" size="icon" className="relative hover:bg-accent/50">
+          <Link href="/wishlist" passHref legacyBehavior>
+            <Button variant="ghost" size="icon" className="hidden md:inline-flex relative hover:bg-accent/50">
               <Heart className="h-5 w-5" />
               {wishlistItemCount > 0 && (
                 <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full h-4 w-4 flex items-center justify-center">
@@ -70,8 +73,8 @@ export default function Header() {
               <span className="sr-only">Wishlist</span>
             </Button>
           </Link>
-          <Link href="/cart" passHref>
-            <Button variant="ghost" size="icon" className="relative hover:bg-accent/50">
+          <Link href="/cart" passHref legacyBehavior>
+            <Button variant="ghost" size="icon" className="hidden md:inline-flex relative hover:bg-accent/50">
               <ShoppingCart className="h-5 w-5" />
               {cartItemCount > 0 && (
                 <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full h-4 w-4 flex items-center justify-center">
@@ -84,15 +87,15 @@ export default function Header() {
           
           {!loading && (
             currentUser ? (
-              <Link href="/account" passHref>
-                <Button variant="ghost" size="icon" className="hover:bg-accent/50">
+              <Link href="/account" passHref legacyBehavior>
+                <Button variant="ghost" size="icon" className="hidden md:inline-flex hover:bg-accent/50">
                   <User className="h-5 w-5" />
                   <span className="sr-only">Account</span>
                 </Button>
               </Link>
             ) : (
-              <Link href="/login" passHref>
-                <Button variant="ghost" size="icon" className="hover:bg-accent/50">
+              <Link href="/login" passHref legacyBehavior>
+                <Button variant="ghost" size="icon" className="hidden md:inline-flex hover:bg-accent/50">
                   <LogIn className="h-5 w-5" />
                   <span className="sr-only">Login</span>
                 </Button>
@@ -100,12 +103,13 @@ export default function Header() {
             )
           )}
           {loading && (
-             <Button variant="ghost" size="icon" className="hover:bg-accent/50" disabled>
+             <Button variant="ghost" size="icon" className="hidden md:inline-flex hover:bg-accent/50" disabled>
                 <User className="h-5 w-5 animate-pulse" />
                 <span className="sr-only">Loading User</span>
             </Button>
           )}
 
+          {/* Mobile Menu Trigger */}
           <div className="md:hidden">
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
               <SheetTrigger asChild>
@@ -114,37 +118,55 @@ export default function Header() {
                   <span className="sr-only">Open menu</span>
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-[280px] bg-background p-6">
-                <div className="mt-8 flex flex-col space-y-4">
-                <SiteLogo />
+              <SheetContent side="right" className="w-[280px] bg-background p-0 flex flex-col">
+                <div className="p-6">
+                  <SiteLogo />
+                </div>
+                <Separator />
+                <nav className="flex-grow p-6 space-y-3">
                   {navLinks.map((link) => (
                     <Link
                       key={link.href}
                       href={link.href}
-                      className="text-lg text-foreground hover:text-primary transition-colors font-medium py-2"
+                      className="block text-lg text-foreground hover:text-primary transition-colors font-medium py-2"
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       {link.label}
                     </Link>
                   ))}
-                  <div className="pt-4 border-t border-border">
+                </nav>
+                <Separator />
+                <div className="p-6 space-y-3">
+                  <Link href="/wishlist" className="flex items-center text-lg text-foreground hover:text-primary transition-colors font-medium py-2" onClick={() => setMobileMenuOpen(false)}>
+                    <Heart className="mr-3 h-5 w-5" /> Wishlist 
+                    {wishlistItemCount > 0 && <span className="ml-auto bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">{wishlistItemCount}</span>}
+                  </Link>
+                  <Link href="/cart" className="flex items-center text-lg text-foreground hover:text-primary transition-colors font-medium py-2" onClick={() => setMobileMenuOpen(false)}>
+                    <ShoppingCart className="mr-3 h-5 w-5" /> Cart
+                    {cartItemCount > 0 && <span className="ml-auto bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">{cartItemCount}</span>}
+                  </Link>
+                  <Separator />
                   {!loading && (
                     currentUser ? (
                       <>
-                        <Link href="/account" className="text-lg text-foreground hover:text-primary transition-colors font-medium py-2 block" onClick={() => setMobileMenuOpen(false)}>
-                          My Account
+                        <Link href="/account" className="flex items-center text-lg text-foreground hover:text-primary transition-colors font-medium py-2" onClick={() => setMobileMenuOpen(false)}>
+                          <User className="mr-3 h-5 w-5" /> My Account
                         </Link>
-                        <Button variant="ghost" className="w-full justify-start text-lg text-destructive hover:text-destructive py-2 px-0" onClick={() => { handleLogout(); setMobileMenuOpen(false); }}>
-                          <LogOut className="mr-2 h-5 w-5" /> Logout
+                        <Button variant="ghost" className="w-full justify-start text-lg text-destructive hover:text-destructive px-0 py-2 font-medium" onClick={handleLogout}>
+                          <LogOut className="mr-3 h-5 w-5" /> Logout
                         </Button>
                       </>
                     ) : (
-                      <Link href="/login" className="text-lg text-foreground hover:text-primary transition-colors font-medium py-2 block" onClick={() => setMobileMenuOpen(false)}>
-                        <LogIn className="mr-2 h-5 w-5 inline-block" /> Login / Sign Up
+                      <Link href="/login" className="flex items-center text-lg text-foreground hover:text-primary transition-colors font-medium py-2" onClick={() => setMobileMenuOpen(false)}>
+                        <LogIn className="mr-3 h-5 w-5" /> Login / Sign Up
                       </Link>
                     )
                   )}
-                  </div>
+                  {loading && (
+                    <div className="flex items-center text-lg text-muted-foreground font-medium py-2">
+                        <User className="mr-3 h-5 w-5 animate-pulse" /> Loading...
+                    </div>
+                  )}
                 </div>
               </SheetContent>
             </Sheet>
