@@ -1,3 +1,4 @@
+
 'use client';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -12,8 +13,10 @@ import { useCart } from '@/contexts/CartContext';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
-// useRouter might be needed for navigation after successful checkout
-// import { useRouter } from 'next/navigation'; 
+import { useAuth } from '@/contexts/AuthContext'; // Added
+import { useRouter } from 'next/navigation'; // Added
+import { useEffect } from 'react'; // Added
+import { Loader2 } from 'lucide-react';
 
 
 const shippingSchema = z.object({
@@ -23,16 +26,15 @@ const shippingSchema = z.object({
   address: z.string().min(1, { message: "Address is required." }),
   apartment: z.string().optional(),
   city: z.string().min(1, { message: "City is required." }),
-  country: z.string().min(1, { message: "Country is required." }), // Consider using a Select component
+  country: z.string().min(1, { message: "Country is required." }), 
   postalCode: z.string().min(1, { message: "Postal code is required." }),
   phone: z.string().optional(),
 });
 
-// Placeholder, expand with actual payment fields as needed
 const paymentSchema = z.object({
-    cardNumber: z.string().min(16, "Invalid card number").max(16, "Invalid card number"),
+    cardNumber: z.string().min(16, "Invalid card number").max(19, "Invalid card number").regex(/^\d+$/, "Card number must be digits only"),
     expiryDate: z.string().regex(/^(0[1-9]|1[0-2])\/\d{2}$/, "Invalid expiry date (MM/YY)"),
-    cvc: z.string().min(3, "Invalid CVC").max(4, "Invalid CVC"),
+    cvc: z.string().min(3, "Invalid CVC").max(4, "Invalid CVC").regex(/^\d+$/, "CVC must be digits only"),
     cardholderName: z.string().min(1, "Cardholder name is required"),
 });
 
@@ -42,18 +44,19 @@ const checkoutSchema = shippingSchema.merge(paymentSchema);
 export default function CheckoutPage() {
   const { cart, totalPrice, totalItems, clearCart } = useCart();
   const { toast } = useToast();
-  // const router = useRouter();
+  const { currentUser, loading: authLoading } = useAuth(); // Added
+  const router = useRouter(); // Added
 
   const form = useForm<z.infer<typeof checkoutSchema>>({
     resolver: zodResolver(checkoutSchema),
     defaultValues: {
-      email: '',
+      email: currentUser?.email || '', // Pre-fill email if user is logged in
       firstName: '',
       lastName: '',
       address: '',
       apartment: '',
       city: '',
-      country: 'United States', // Default country
+      country: 'United States', 
       postalCode: '',
       phone: '',
       cardNumber: '',
@@ -63,15 +66,44 @@ export default function CheckoutPage() {
     },
   });
 
+  useEffect(() => {
+    if (!authLoading && !currentUser) {
+      toast({ title: "Authentication Required", description: "Please log in to proceed to checkout.", variant: "destructive" });
+      router.push('/login?redirect=/checkout');
+    }
+    if (currentUser && !form.getValues('email')) {
+       form.setValue('email', currentUser.email || '');
+    }
+  }, [currentUser, authLoading, router, toast, form]);
+
+
   function onSubmit(values: z.infer<typeof checkoutSchema>) {
     console.log('Checkout submitted:', values);
-    // Here you would typically process the payment and create an order
     toast({
       title: "Order Placed!",
       description: "Thank you for your purchase. Your order is being processed.",
     });
     clearCart();
-    // router.push('/order-confirmation'); // Navigate to an order confirmation page
+    router.push('/'); // Navigate to home after order confirmation (or a dedicated confirmation page)
+  }
+  
+  if (authLoading) {
+    return (
+      <div className="py-12 text-center flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+        <h1 className="text-2xl font-bold font-serif">Loading Checkout</h1>
+        <p className="text-muted-foreground">Please wait while we prepare your checkout page.</p>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    // This state should ideally be brief due to the redirect in useEffect
+    return (
+         <div className="py-12 text-center">
+            <h1 className="text-xl font-bold">Redirecting to login...</h1>
+        </div>
+    )
   }
   
   if (cart.length === 0) {
@@ -94,7 +126,6 @@ export default function CheckoutPage() {
       
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="grid lg:grid-cols-3 gap-8 items-start">
-          {/* Shipping and Payment Forms */}
           <div className="lg:col-span-2 space-y-8">
             <Card className="shadow-lg rounded-xl">
               <CardHeader>
@@ -120,7 +151,7 @@ export default function CheckoutPage() {
                 <FormField name="apartment" render={({ field }) => ( <FormItem><FormLabel>Apartment, suite, etc. (optional)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
                 <div className="grid sm:grid-cols-3 gap-4">
                   <FormField name="city" render={({ field }) => ( <FormItem><FormLabel>City</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-                  <FormField name="country" render={({ field }) => ( <FormItem><FormLabel>Country</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} /> {/* TODO: Make this a Select */}
+                  <FormField name="country" render={({ field }) => ( <FormItem><FormLabel>Country</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
                   <FormField name="postalCode" render={({ field }) => ( <FormItem><FormLabel>Postal Code</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
                 </div>
                 <FormField name="phone" render={({ field }) => ( <FormItem><FormLabel>Phone (optional)</FormLabel><FormControl><Input type="tel" {...field} /></FormControl><FormDescription>For shipping updates.</FormDescription><FormMessage /></FormItem> )} />
@@ -138,12 +169,10 @@ export default function CheckoutPage() {
                         <FormField name="expiryDate" render={({ field }) => ( <FormItem><FormLabel>Expiry Date</FormLabel><FormControl><Input placeholder="MM/YY" {...field} /></FormControl><FormMessage /></FormItem> )} />
                         <FormField name="cvc" render={({ field }) => ( <FormItem><FormLabel>CVC</FormLabel><FormControl><Input placeholder="123" {...field} /></FormControl><FormMessage /></FormItem> )} />
                     </div>
-                    {/* Add billing address if different from shipping */}
                 </CardContent>
             </Card>
           </div>
 
-          {/* Order Summary */}
           <Card className="lg:col-span-1 sticky top-24 shadow-xl rounded-xl p-6">
             <CardHeader className="p-0 pb-4">
               <CardTitle className="text-xl font-serif">Order Summary</CardTitle>
@@ -182,7 +211,11 @@ export default function CheckoutPage() {
             </CardContent>
             <CardFooter className="p-0 pt-6">
               <Button type="submit" size="lg" className="w-full text-lg" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? 'Processing...' : 'Place Order'}
+                {form.formState.isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Processing...
+                  </>
+                ) : 'Place Order'}
               </Button>
             </CardFooter>
           </Card>

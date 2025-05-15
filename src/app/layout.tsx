@@ -1,3 +1,4 @@
+
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import { Lora } from 'next/font/google';
@@ -7,6 +8,7 @@ import Footer from '@/components/layout/Footer';
 import { Toaster } from '@/components/ui/toaster';
 import { WishlistProvider } from '@/contexts/WishlistContext';
 import { CartProvider } from '@/contexts/CartContext';
+import { AuthProvider } from '@/contexts/AuthContext'; // Added AuthProvider
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -38,16 +40,18 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} ${lora.variable} font-sans antialiased flex flex-col min-h-screen`}>
-        <WishlistProvider>
-          <CartProvider>
-            <Header />
-            <main className="flex-grow container mx-auto px-4 py-8">
-              {children}
-            </main>
-            <Footer />
-            <Toaster />
-          </CartProvider>
-        </WishlistProvider>
+        <AuthProvider> {/* Wrapped with AuthProvider */}
+          <WishlistProvider>
+            <CartProvider>
+              <Header />
+              <main className="flex-grow container mx-auto px-4 py-8">
+                {children}
+              </main>
+              <Footer />
+              <Toaster />
+            </CartProvider>
+          </WishlistProvider>
+        </AuthProvider>
       </body>
     </html>
   );
