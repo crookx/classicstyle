@@ -6,7 +6,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
@@ -14,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
+import { Loader2 } from 'lucide-react';
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -26,7 +26,7 @@ const signupSchema = z.object({
   confirmPassword: z.string().min(6, {message: "Password must be at least 6 characters."})
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
-  path: ["confirmPassword"], // path of error
+  path: ["confirmPassword"],
 });
 
 
@@ -34,7 +34,7 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 type SignupFormValues = z.infer<typeof signupSchema>;
 
 export default function LoginPage() {
-  const { login, signup, currentUser } = useAuth();
+  const { login, signup, currentUser, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -42,6 +42,8 @@ export default function LoginPage() {
 
   const [isLoginView, setIsLoginView] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
 
   const loginForm = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -55,26 +57,35 @@ export default function LoginPage() {
 
   async function onLoginSubmit(values: LoginFormValues) {
     setAuthError(null);
+    setIsSubmitting(true);
     try {
       await login(values.email, values.password);
       toast({ title: "Login Successful!", description: "Welcome back." });
       router.push(redirectPath);
     } catch (error: any) {
       handleAuthError(error);
+    } finally {
+      setIsSubmitting(false);
     }
   }
   
   async function onSignupSubmit(values: SignupFormValues) {
     setAuthError(null);
+    setIsSubmitting(true);
     try {
       await signup(values.email, values.password);
-      toast({ title: "Signup Successful!", description: "Welcome! Please log in." });
-      setIsLoginView(true); // Switch to login view after signup
-      loginForm.reset(); // Reset login form if needed
+      toast({ title: "Signup Successful!", description: "Welcome! Your account has been created." });
+      // Keep user on login page, perhaps pre-fill email or just let them log in
+      setIsLoginView(true); 
+      loginForm.setValue('email', values.email); // Pre-fill email in login form
+      loginForm.resetField('password');
       signupForm.reset();
-      router.push(redirectPath); // Or redirect to login with a message
+      // Don't auto-redirect, let them log in with their new credentials.
+      // router.push(redirectPath); 
     } catch (error: any) {
       handleAuthError(error);
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -84,6 +95,7 @@ export default function LoginPage() {
       switch (error.code) {
         case "auth/user-not-found":
         case "auth/wrong-password":
+        case "auth/invalid-credential": // Added for newer Firebase SDKs
           message = "Invalid email or password.";
           break;
         case "auth/email-already-in-use":
@@ -103,9 +115,22 @@ export default function LoginPage() {
     toast({ title: isLoginView ? "Login Failed" : "Signup Failed", description: message, variant: "destructive" });
   }
 
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   if (currentUser) {
-    router.push('/'); // Already logged in
-    return null;
+    router.push(redirectPath); 
+    return (
+        <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
+            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            <p className="ml-4 text-lg">Redirecting...</p>
+        </div>
+    );
   }
 
 
@@ -120,65 +145,99 @@ export default function LoginPage() {
           {isLoginView ? (
             <Form {...loginForm}>
               <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-6">
-                <FormField control={loginForm.control} name="email" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email</FormLabel>
-                    <FormControl><Input placeholder="you@example.com" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={loginForm.control} name="password" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Password</FormLabel>
-                    <FormControl><Input type="password" placeholder="••••••••" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+                <FormField
+                  control={loginForm.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input placeholder="you@example.com" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={loginForm.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Password</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="••••••••" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                  {authError && <p className="text-sm font-medium text-destructive">{authError}</p>}
-                <Button type="submit" className="w-full text-lg" disabled={loginForm.formState.isSubmitting}>
-                  {loginForm.formState.isSubmitting ? 'Logging in...' : 'Log In'}
+                <Button type="submit" className="w-full text-lg" disabled={isSubmitting}>
+                  {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
+                  {isSubmitting ? 'Logging in...' : 'Log In'}
                 </Button>
               </form>
             </Form>
           ) : (
             <Form {...signupForm}>
               <form onSubmit={signupForm.handleSubmit(onSignupSubmit)} className="space-y-6">
-                <FormField control={signupForm.control} name="email" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email</FormLabel>
-                    <FormControl><Input placeholder="you@example.com" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={signupForm.control} name="password" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Password</FormLabel>
-                    <FormControl><Input type="password" placeholder="Create a password" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={signupForm.control} name="confirmPassword" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Confirm Password</FormLabel>
-                    <FormControl><Input type="password" placeholder="Confirm your password" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+                <FormField
+                  control={signupForm.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input placeholder="you@example.com" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={signupForm.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Password</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="Create a password (min. 6 characters)" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={signupForm.control}
+                  name="confirmPassword"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Confirm Password</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="Confirm your password" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 {authError && <p className="text-sm font-medium text-destructive">{authError}</p>}
-                <Button type="submit" className="w-full text-lg" disabled={signupForm.formState.isSubmitting}>
-                 {signupForm.formState.isSubmitting ? 'Signing up...' : 'Sign Up'}
+                <Button type="submit" className="w-full text-lg" disabled={isSubmitting}>
+                  {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
+                  {isSubmitting ? 'Signing up...' : 'Sign Up'}
                 </Button>
               </form>
             </Form>
           )}
         </CardContent>
-        <CardFooter className="flex flex-col items-center space-y-2">
+        <CardFooter className="flex flex-col items-center">
            <Separator className="my-4" />
            <Button variant="link" onClick={() => {
              setIsLoginView(!isLoginView);
              setAuthError(null);
-             loginForm.reset();
-             signupForm.reset();
+             // Reset forms when switching views
+             loginForm.reset({ email: '', password: '' }); 
+             signupForm.reset({ email: '', password: '', confirmPassword: '' });
+             setIsSubmitting(false); // Reset submitting state
             }}>
             {isLoginView ? "Don't have an account? Sign Up" : "Already have an account? Log In"}
           </Button>
