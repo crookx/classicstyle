@@ -3,15 +3,14 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-// import ProductGrid from '@/components/product/ProductGrid'; // No longer using ProductGrid for featured
-import ProductCard from '@/components/product/ProductCard'; // Import ProductCard
+import ProductCard from '@/components/product/ProductCard';
 import CollectionCard from '@/components/collections/CollectionCard';
 import ProductRecommendations from '@/components/product/ProductRecommendations';
 import { mockProducts, mockCollections } from '@/data/mock-data';
 import { ArrowRight } from 'lucide-react';
 
 export default function HomePage() {
-  const featuredProducts = mockProducts.filter(p => p.tags?.includes('featured')).slice(0, 6); // Get 6 featured or adjust filter
+  const featuredProducts = mockProducts.filter(p => p.tags?.includes('featured')).slice(0, 6);
   const displayedCollections = mockCollections.slice(0, 3);
 
   return (
@@ -21,8 +20,9 @@ export default function HomePage() {
         <Image
           src="https://placehold.co/1600x900.png"
           alt="Elegant fashion model"
-          layout="fill"
-          objectFit="cover"
+          fill // Changed from layout="fill"
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" // Added sizes for responsiveness with fill
+          style={{objectFit: "cover"}} // Changed from objectFit="cover"
           className="brightness-75"
           data-ai-hint="fashion model editorial"
           priority
@@ -52,13 +52,17 @@ export default function HomePage() {
             </Button>
           </Link>
         </div>
-        <div className="flex overflow-x-auto space-x-6 pb-4 -mx-4 px-4"> {/* Horizontal scroll container */}
-          {featuredProducts.map((product) => (
-            <div key={product.id} className="min-w-[280px] w-72 flex-shrink-0"> {/* Product card wrapper for consistent width */}
-              <ProductCard product={product} />
-            </div>
-          ))}
-        </div>
+        {featuredProducts.length > 0 ? (
+          <div className="flex overflow-x-auto space-x-6 pb-4 -mx-4 px-4"> {/* Horizontal scroll container */}
+            {featuredProducts.map((product) => (
+              <div key={product.id} className="min-w-[280px] w-72 sm:w-80 flex-shrink-0"> {/* Product card wrapper for consistent width */}
+                <ProductCard product={product} />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-center text-muted-foreground py-8">No featured products available at the moment. Check back soon!</p>
+        )}
       </section>
 
       {/* Themed Collections Section */}

@@ -10,7 +10,8 @@ import { useWishlist } from '@/contexts/WishlistContext';
 import { useCart } from '@/contexts/CartContext';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation'; // Keep if redirecting, remove if not used in this component directly
+import { cn } from '@/lib/utils';
 
 interface ProductCardProps {
   product: Product;
@@ -21,17 +22,19 @@ export default function ProductCard({ product }: ProductCardProps) {
   const { addToCart } = useCart();
   const { toast } = useToast();
   const { currentUser, loading: authLoading } = useAuth();
-  const router = useRouter();
+  const router = useRouter(); // Used for redirecting to login
 
-  const handleWishlistToggle = () => {
-    if (authLoading) return; // Do nothing if auth state is loading
+  const handleWishlistToggle = (e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent link navigation if card is wrapped in Link
+    e.stopPropagation(); // Stop event from bubbling up
+    if (authLoading) return;
     if (!currentUser) {
       toast({
         title: 'Authentication Required',
         description: 'Please log in to add items to your wishlist.',
         variant: 'destructive',
       });
-      router.push(`/login?redirect=${router.asPath}`);
+      router.push(`/login?redirect=${window.location.pathname}`); // Use current path for redirect
       return;
     }
 
@@ -44,15 +47,17 @@ export default function ProductCard({ product }: ProductCardProps) {
     }
   };
 
-  const handleAddToCart = () => {
-    if (authLoading) return; // Do nothing if auth state is loading
+  const handleAddToCart = (e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent link navigation if card is wrapped in Link
+    e.stopPropagation(); // Stop event from bubbling up
+    if (authLoading) return;
     if (!currentUser) {
       toast({
         title: 'Authentication Required',
         description: 'Please log in to add items to your cart.',
         variant: 'destructive',
       });
-      router.push(`/login?redirect=${router.asPath}`);
+      router.push(`/login?redirect=${window.location.pathname}`); // Use current path for redirect
       return;
     }
     addToCart(product);
@@ -61,27 +66,50 @@ export default function ProductCard({ product }: ProductCardProps) {
 
   return (
     <Card className="overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 rounded-lg flex flex-col h-full group">
-      <Link href={`/products/${product.id}`} className="block">
-        <CardHeader className="p-0 relative">
-          <div className="aspect-[3/4] overflow-hidden">
-            <Image
-              src={product.imageUrl}
-              alt={product.name}
-              width={600}
-              height={800}
-              className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-300"
-              data-ai-hint={product.dataAiHint}
-            />
+      <CardHeader className="p-0 relative">
+        <Link href={`/products/${product.id}`} className="block aspect-[4/5] overflow-hidden group">
+          <Image
+            src={product.imageUrl}
+            alt={product.name}
+            width={600}
+            height={750} // Adjusted to match 4/5 aspect ratio
+            className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-300"
+            data-ai-hint={product.dataAiHint || product.category || 'product image'}
+          />
+          <div className="absolute top-3 right-3 z-10 flex flex-col space-y-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleWishlistToggle}
+              className={cn(
+                "bg-background/80 hover:bg-background text-muted-foreground rounded-full shadow-md",
+                isInWishlist(product.id) ? 'text-destructive border-destructive hover:text-destructive' : 'hover:text-primary'
+              )}
+              aria-label={isInWishlist(product.id) ? "Remove from wishlist" : "Add to wishlist"}
+              disabled={authLoading}
+            >
+              <Heart className={`h-5 w-5 ${isInWishlist(product.id) ? 'fill-current' : ''}`} />
+            </Button>
+            <Button 
+              variant="outline" 
+              size="icon" 
+              onClick={handleAddToCart} 
+              className="bg-background/80 hover:bg-background text-muted-foreground hover:text-primary rounded-full shadow-md"
+              disabled={authLoading}
+              aria-label="Add to cart"
+            >
+              <ShoppingCart className="h-5 w-5" />
+            </Button>
           </div>
-        </CardHeader>
-      </Link>
+        </Link>
+      </CardHeader>
       <CardContent className="p-4 flex-grow">
         <Link href={`/products/${product.id}`} className="block">
-          <CardTitle className="text-lg font-serif font-medium leading-tight mb-1 group-hover:text-primary transition-colors">
+          <CardTitle className="text-lg font-serif font-medium leading-tight mb-1 group-hover:text-primary transition-colors line-clamp-2">
             {product.name}
           </CardTitle>
         </Link>
-        {product.category && <p className="text-xs text-muted-foreground mb-2">{product.category}</p>}
+        {product.category && <p className="text-xs text-muted-foreground mb-2">{product.category}{product.subCategory ? ` - ${product.subCategory}` : ''}</p>}
         <p className="text-base font-semibold text-foreground">
           ${product.price.toFixed(2)}
           {product.originalPrice && (
@@ -89,21 +117,10 @@ export default function ProductCard({ product }: ProductCardProps) {
             )}
         </p>
       </CardContent>
-      <CardFooter className="p-4 pt-0 flex justify-between items-center">
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={handleWishlistToggle}
-          className={`hover:bg-accent/80 ${isInWishlist(product.id) ? 'text-destructive border-destructive hover:text-destructive' : 'text-muted-foreground'}`}
-          aria-label={isInWishlist(product.id) ? "Remove from wishlist" : "Add to wishlist"}
-          disabled={authLoading}
-        >
-          <Heart className={`h-5 w-5 ${isInWishlist(product.id) ? 'fill-current' : ''}`} />
-        </Button>
-        <Button onClick={handleAddToCart} variant="outline" className="group-hover:bg-primary group-hover:text-primary-foreground transition-colors" disabled={authLoading}>
-          <ShoppingCart className="h-5 w-5 mr-2" />
-          Add to Cart
-        </Button>
+      <CardFooter className="p-4 pt-0">
+         <Button asChild variant="outline" className="w-full group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+            <Link href={`/products/${product.id}`}>View Details</Link>
+         </Button>
       </CardFooter>
     </Card>
   );

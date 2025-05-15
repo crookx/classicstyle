@@ -63,7 +63,7 @@ export default function LoginPage() {
       toast({ title: "Login Successful!", description: "Welcome back." });
       router.push(redirectPath);
     } catch (error: any) {
-      handleAuthError(error);
+      handleAuthError(error, "Login Failed");
     } finally {
       setIsSubmitting(false);
     }
@@ -74,28 +74,25 @@ export default function LoginPage() {
     setIsSubmitting(true);
     try {
       await signup(values.email, values.password);
-      toast({ title: "Signup Successful!", description: "Welcome! Your account has been created." });
-      // Keep user on login page, perhaps pre-fill email or just let them log in
+      toast({ title: "Signup Successful!", description: "Welcome! Your account has been created. Please log in." });
       setIsLoginView(true); 
-      loginForm.setValue('email', values.email); // Pre-fill email in login form
+      loginForm.setValue('email', values.email); 
       loginForm.resetField('password');
       signupForm.reset();
-      // Don't auto-redirect, let them log in with their new credentials.
-      // router.push(redirectPath); 
     } catch (error: any) {
-      handleAuthError(error);
+      handleAuthError(error, "Signup Failed");
     } finally {
       setIsSubmitting(false);
     }
   }
 
-  const handleAuthError = (error: any) => {
+  const handleAuthError = (error: any, type: "Login Failed" | "Signup Failed") => {
     let message = "An unexpected error occurred. Please try again.";
     if (error.code) {
       switch (error.code) {
         case "auth/user-not-found":
         case "auth/wrong-password":
-        case "auth/invalid-credential": // Added for newer Firebase SDKs
+        case "auth/invalid-credential":
           message = "Invalid email or password.";
           break;
         case "auth/email-already-in-use":
@@ -112,7 +109,7 @@ export default function LoginPage() {
       }
     }
     setAuthError(message);
-    toast({ title: isLoginView ? "Login Failed" : "Signup Failed", description: message, variant: "destructive" });
+    toast({ title: type, description: message, variant: "destructive" });
   }
 
   if (authLoading) {
@@ -171,7 +168,7 @@ export default function LoginPage() {
                     </FormItem>
                   )}
                 />
-                 {authError && <p className="text-sm font-medium text-destructive">{authError}</p>}
+                 {authError && isLoginView && <p className="text-sm font-medium text-destructive">{authError}</p>}
                 <Button type="submit" className="w-full text-lg" disabled={isSubmitting}>
                   {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
                   {isSubmitting ? 'Logging in...' : 'Log In'}
@@ -220,7 +217,7 @@ export default function LoginPage() {
                     </FormItem>
                   )}
                 />
-                {authError && <p className="text-sm font-medium text-destructive">{authError}</p>}
+                {authError && !isLoginView && <p className="text-sm font-medium text-destructive">{authError}</p>}
                 <Button type="submit" className="w-full text-lg" disabled={isSubmitting}>
                   {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
                   {isSubmitting ? 'Signing up...' : 'Sign Up'}
@@ -234,10 +231,9 @@ export default function LoginPage() {
            <Button variant="link" onClick={() => {
              setIsLoginView(!isLoginView);
              setAuthError(null);
-             // Reset forms when switching views
              loginForm.reset({ email: '', password: '' }); 
              signupForm.reset({ email: '', password: '', confirmPassword: '' });
-             setIsSubmitting(false); // Reset submitting state
+             setIsSubmitting(false);
             }}>
             {isLoginView ? "Don't have an account? Sign Up" : "Already have an account? Log In"}
           </Button>
