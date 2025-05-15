@@ -1,16 +1,17 @@
+
 'use client';
 import { useEffect, useState } from 'react';
 import { getPersonalizedRecommendations, type PersonalizedRecommendationsInput } from '@/ai/flows/product-recommendations';
 import type { Product } from '@/types';
 import { mockProducts } from '@/data/mock-data';
 import ProductCard from '@/components/product/ProductCard';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { CardContent, CardHeader, CardTitle } from '@/components/ui/card'; // Removed Card itself as we're using its parts
 import { Skeleton } from '@/components/ui/skeleton';
 
-const MOCK_USER_ID = 'user123';
-const MOCK_BROWSING_HISTORY = ['classic-blouse-001', 'silk-scarf-005'];
-const MOCK_PURCHASE_HISTORY = ['leather-tote-004'];
-const MOCK_WISHLIST = ['cashmere-sweater-003'];
+const MOCK_USER_ID = 'user123'; // This would ideally come from useAuth() if recommendations are user-specific and logged in
+const MOCK_BROWSING_HISTORY = ['mens-chinos-classic-002', 'womens-blouse-silk-002'];
+const MOCK_PURCHASE_HISTORY = ['accs-handbag-leather-001'];
+const MOCK_WISHLIST = ['mens-jeans-slim-001'];
 
 export default function ProductRecommendations() {
   const [recommendations, setRecommendations] = useState<Product[]>([]);
@@ -27,7 +28,7 @@ export default function ProductRecommendations() {
           browsingHistory: MOCK_BROWSING_HISTORY,
           purchaseHistory: MOCK_PURCHASE_HISTORY,
           wishlist: MOCK_WISHLIST,
-          numRecommendations: 4,
+          numRecommendations: 6, // Fetch more to allow for scrolling
         };
         const result = await getPersonalizedRecommendations(input);
         
@@ -35,12 +36,13 @@ export default function ProductRecommendations() {
           .map(id => mockProducts.find(p => p.id === id))
           .filter(p => p !== undefined) as Product[];
         
-        if (recommendedProducts.length < input.numRecommendations) {
+        // Fallback logic if AI provides fewer than numRecommendations
+        if (recommendedProducts.length < input.numRecommendations!) {
             const existingIds = new Set(recommendedProducts.map(p => p.id));
             const fallbackNeeded = input.numRecommendations! - recommendedProducts.length;
             const fallbacks = mockProducts
-                .filter(p => !existingIds.has(p.id) && p.id !== 'product-to-exclude') // Example of excluding a specific product
-                .sort(() => 0.5 - Math.random()) // Shuffle for variety
+                .filter(p => !existingIds.has(p.id)) 
+                .sort(() => 0.5 - Math.random()) 
                 .slice(0, fallbackNeeded);
             recommendedProducts.push(...fallbacks);
         }
@@ -50,8 +52,7 @@ export default function ProductRecommendations() {
       } catch (e) {
         console.error("Failed to fetch recommendations:", e);
         setError("Could not load recommendations at this time.");
-        // Fallback to some generic products if AI fails
-        setRecommendations(mockProducts.sort(() => 0.5 - Math.random()).slice(0, 4));
+        setRecommendations(mockProducts.sort(() => 0.5 - Math.random()).slice(0, 6)); // Fallback to 6 random products
       } finally {
         setLoading(false);
       }
@@ -61,17 +62,23 @@ export default function ProductRecommendations() {
 
   if (loading) {
     return (
-      <section className="py-12 bg-muted/30 rounded-xl">
-        <CardHeader>
-          <CardTitle className="text-3xl font-serif text-center mb-8">Just For You</CardTitle>
+      <section className="py-12 bg-background rounded-xl shadow-xl my-12">
+        <CardHeader className="pb-8">
+          <CardTitle className="text-3xl font-serif text-center text-secondary">
+            Just For You
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+          <div className="flex overflow-x-auto space-x-6 pb-4 -mx-4 px-4">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="bg-card p-4 rounded-lg shadow-md">
+              <div key={i} className="min-w-[280px] w-72 flex-shrink-0 bg-card p-4 rounded-lg shadow-md">
                 <Skeleton className="aspect-[3/4] w-full rounded-md mb-4" />
                 <Skeleton className="h-5 w-3/4 mb-2 rounded" />
-                <Skeleton className="h-4 w-1/2 rounded" />
+                <Skeleton className="h-4 w-1/2 mb-4 rounded" />
+                <div className="flex justify-between">
+                    <Skeleton className="h-8 w-8 rounded-full" />
+                    <Skeleton className="h-8 w-24 rounded" />
+                </div>
               </div>
             ))}
           </div>
@@ -81,20 +88,17 @@ export default function ProductRecommendations() {
   }
   
   if (recommendations.length === 0 && !error) {
-      // If AI returns nothing and there's no error, maybe show generic popular items or nothing
       return (
-        <section className="py-12 bg-muted/30 rounded-xl">
+        <section className="py-12 bg-muted/30 rounded-xl my-12">
          <CardHeader>
-            <CardTitle className="text-3xl font-serif text-center mb-8">Discover More</CardTitle>
+            <CardTitle className="text-3xl font-serif text-center mb-4">Discover More</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-center text-muted-foreground">Explore our latest arrivals.</p>
-            {/* Optionally show some generic products here */}
           </CardContent>
         </section>
       );
   }
-
 
   return (
     <section className="py-12 bg-background rounded-xl shadow-xl my-12">
@@ -105,9 +109,11 @@ export default function ProductRecommendations() {
         {error && <p className="text-center text-destructive mt-2">{error}</p>}
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
+        <div className="flex overflow-x-auto space-x-6 pb-4 -mx-4 px-4">
           {recommendations.map(product => (
-            <ProductCard key={product.id} product={product} />
+            <div key={product.id} className="min-w-[280px] w-72 flex-shrink-0">
+              <ProductCard product={product} />
+            </div>
           ))}
         </div>
       </CardContent>

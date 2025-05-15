@@ -1,5 +1,6 @@
+
 'use client';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation'; // Added useRouter
 import Image from 'next/image';
 import { mockProducts, mockCollections } from '@/data/mock-data';
 import type { Product } from '@/types';
@@ -18,10 +19,12 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion"
+import { useAuth } from '@/contexts/AuthContext'; // Added
 
 export default function ProductDetailPage() {
   const params = useParams();
   const productId = params.productId as string;
+  const router = useRouter(); // Added
   
   const [product, setProduct] = useState<Product | null>(null);
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
@@ -31,6 +34,7 @@ export default function ProductDetailPage() {
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
   const { addToCart } = useCart();
   const { toast } = useToast();
+  const { currentUser, loading: authLoading } = useAuth(); // Added
 
   useEffect(() => {
     const foundProduct = mockProducts.find(p => p.id === productId);
@@ -39,7 +43,6 @@ export default function ProductDetailPage() {
       setSelectedColor(foundProduct.colors?.[0]?.name);
       setSelectedSize(foundProduct.sizes?.[0]);
 
-      // Find related products (e.g., same category, excluding current product)
       const related = mockProducts.filter(
         p => p.category === foundProduct.category && p.id !== foundProduct.id
       ).slice(0, 4);
@@ -56,6 +59,17 @@ export default function ProductDetailPage() {
   }
 
   const handleWishlistToggle = () => {
+    if (authLoading) return;
+    if (!currentUser) {
+      toast({
+        title: 'Authentication Required',
+        description: 'Please log in to add items to your wishlist.',
+        variant: 'destructive',
+      });
+      router.push(`/login?redirect=${router.asPath}`);
+      return;
+    }
+
     if (isInWishlist(product.id)) {
       removeFromWishlist(product.id);
       toast({ title: `${product.name} removed from wishlist.` });
@@ -66,7 +80,17 @@ export default function ProductDetailPage() {
   };
 
   const handleAddToCart = () => {
-    addToCart(product); // Add quantity selection later if needed
+    if (authLoading) return;
+    if (!currentUser) {
+      toast({
+        title: 'Authentication Required',
+        description: 'Please log in to add items to your cart.',
+        variant: 'destructive',
+      });
+      router.push(`/login?redirect=${router.asPath}`);
+      return;
+    }
+    addToCart(product); 
     toast({ title: `${product.name} added to cart.` });
   };
 
@@ -84,7 +108,6 @@ export default function ProductDetailPage() {
             data-ai-hint={product.dataAiHint}
             priority
           />
-          {/* Add more images or a carousel here if available */}
         </div>
 
         {/* Product Details */}
@@ -149,7 +172,7 @@ export default function ProductDetailPage() {
           <Separator />
 
           <div className="flex flex-col sm:flex-row gap-4">
-            <Button size="lg" onClick={handleAddToCart} className="flex-1 bg-primary hover:bg-primary/90">
+            <Button size="lg" onClick={handleAddToCart} className="flex-1 bg-primary hover:bg-primary/90" disabled={authLoading}>
               <ShoppingCart className="mr-2 h-5 w-5" /> Add to Cart
             </Button>
             <Button
@@ -157,6 +180,7 @@ export default function ProductDetailPage() {
               variant="outline"
               onClick={handleWishlistToggle}
               className={`flex-1 ${isInWishlist(product.id) ? 'text-destructive border-destructive hover:text-destructive' : ''}`}
+              disabled={authLoading}
             >
               <Heart className={`mr-2 h-5 w-5 ${isInWishlist(product.id) ? 'fill-current' : ''}`} /> 
               {isInWishlist(product.id) ? 'Remove from Wishlist' : 'Add to Wishlist'}
@@ -208,15 +232,12 @@ export default function ProductDetailPage() {
         </TabsContent>
         <TabsContent value="reviews" className="p-4 bg-card rounded-lg shadow">
           <p className="text-muted-foreground">Customer reviews will be displayed here.</p>
-          {/* Placeholder for reviews component */}
         </TabsContent>
         <TabsContent value="care" className="p-4 bg-card rounded-lg shadow">
           <p className="text-muted-foreground">Care instructions for this product will be displayed here. Typically: {product.details?.find(d => d.toLowerCase().includes('clean') || d.toLowerCase().includes('wash')) || 'Follow label instructions.'}</p>
         </TabsContent>
       </Tabs>
 
-
-      {/* Related Products Section */}
       {relatedProducts.length > 0 && (
         <section className="mt-16">
           <h2 className="text-3xl font-serif font-semibold mb-8 text-center">You Might Also Like</h2>

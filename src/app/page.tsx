@@ -1,16 +1,18 @@
+
 import Image from 'next/image';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import ProductGrid from '@/components/product/ProductGrid';
+// import ProductGrid from '@/components/product/ProductGrid'; // No longer using ProductGrid for featured
+import ProductCard from '@/components/product/ProductCard'; // Import ProductCard
 import CollectionCard from '@/components/collections/CollectionCard';
 import ProductRecommendations from '@/components/product/ProductRecommendations';
 import { mockProducts, mockCollections } from '@/data/mock-data';
 import { ArrowRight } from 'lucide-react';
 
 export default function HomePage() {
-  const featuredProducts = mockProducts.slice(0, 4); // Take first 4 as featured
-  const displayedCollections = mockCollections.slice(0, 3); // Take first 3 collections
+  const featuredProducts = mockProducts.filter(p => p.tags?.includes('featured')).slice(0, 6); // Get 6 featured or adjust filter
+  const displayedCollections = mockCollections.slice(0, 3);
 
   return (
     <div className="space-y-16">
@@ -42,33 +44,39 @@ export default function HomePage() {
 
       {/* Featured Products Section */}
       <section>
-        <h2 className="text-3xl font-serif font-semibold mb-8 text-center">Featured Products</h2>
-        <ProductGrid products={featuredProducts} />
-        <div className="text-center mt-8">
-            <Link href="/products">
-                <Button variant="outline" className="group">
-                    View All Products <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                </Button>
-            </Link>
+        <div className="flex justify-between items-center mb-8">
+          <h2 className="text-3xl font-serif font-semibold">Featured Products</h2>
+          <Link href="/products?sort=featured">
+            <Button variant="outline" className="group whitespace-nowrap">
+                View All <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+            </Button>
+          </Link>
+        </div>
+        <div className="flex overflow-x-auto space-x-6 pb-4 -mx-4 px-4"> {/* Horizontal scroll container */}
+          {featuredProducts.map((product) => (
+            <div key={product.id} className="min-w-[280px] w-72 flex-shrink-0"> {/* Product card wrapper for consistent width */}
+              <ProductCard product={product} />
+            </div>
+          ))}
         </div>
       </section>
 
       {/* Themed Collections Section */}
       <section className="bg-muted/40 py-12 rounded-xl">
         <div className="container mx-auto">
-          <h2 className="text-3xl font-serif font-semibold mb-8 text-center">Shop by Collection</h2>
+          <div className="flex justify-between items-center mb-8 px-4 sm:px-0">
+            <h2 className="text-3xl font-serif font-semibold">Shop by Collection</h2>
+            <Link href="/collections">
+                <Button variant="outline" className="group whitespace-nowrap">
+                    Explore All <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                </Button>
+            </Link>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {displayedCollections.map((collection) => (
               <CollectionCard key={collection.id} collection={collection} />
             ))}
           </div>
-          <div className="text-center mt-10">
-            <Link href="/collections">
-                <Button variant="outline" className="group">
-                    Explore All Collections <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                </Button>
-            </Link>
-        </div>
         </div>
       </section>
 

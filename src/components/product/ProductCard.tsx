@@ -1,3 +1,4 @@
+
 'use client';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -8,6 +9,8 @@ import { Heart, ShoppingCart } from 'lucide-react';
 import { useWishlist } from '@/contexts/WishlistContext';
 import { useCart } from '@/contexts/CartContext';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'next/navigation';
 
 interface ProductCardProps {
   product: Product;
@@ -17,8 +20,21 @@ export default function ProductCard({ product }: ProductCardProps) {
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
   const { addToCart } = useCart();
   const { toast } = useToast();
+  const { currentUser, loading: authLoading } = useAuth();
+  const router = useRouter();
 
   const handleWishlistToggle = () => {
+    if (authLoading) return; // Do nothing if auth state is loading
+    if (!currentUser) {
+      toast({
+        title: 'Authentication Required',
+        description: 'Please log in to add items to your wishlist.',
+        variant: 'destructive',
+      });
+      router.push(`/login?redirect=${router.asPath}`);
+      return;
+    }
+
     if (isInWishlist(product.id)) {
       removeFromWishlist(product.id);
       toast({ title: `${product.name} removed from wishlist.` });
@@ -29,6 +45,16 @@ export default function ProductCard({ product }: ProductCardProps) {
   };
 
   const handleAddToCart = () => {
+    if (authLoading) return; // Do nothing if auth state is loading
+    if (!currentUser) {
+      toast({
+        title: 'Authentication Required',
+        description: 'Please log in to add items to your cart.',
+        variant: 'destructive',
+      });
+      router.push(`/login?redirect=${router.asPath}`);
+      return;
+    }
     addToCart(product);
     toast({ title: `${product.name} added to cart.` });
   };
@@ -70,10 +96,11 @@ export default function ProductCard({ product }: ProductCardProps) {
           onClick={handleWishlistToggle}
           className={`hover:bg-accent/80 ${isInWishlist(product.id) ? 'text-destructive border-destructive hover:text-destructive' : 'text-muted-foreground'}`}
           aria-label={isInWishlist(product.id) ? "Remove from wishlist" : "Add to wishlist"}
+          disabled={authLoading}
         >
           <Heart className={`h-5 w-5 ${isInWishlist(product.id) ? 'fill-current' : ''}`} />
         </Button>
-        <Button onClick={handleAddToCart} variant="outline" className="group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+        <Button onClick={handleAddToCart} variant="outline" className="group-hover:bg-primary group-hover:text-primary-foreground transition-colors" disabled={authLoading}>
           <ShoppingCart className="h-5 w-5 mr-2" />
           Add to Cart
         </Button>
