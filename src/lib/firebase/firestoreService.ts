@@ -285,7 +285,7 @@ export async function updateOrderStatus(orderId: string, status: OrderStatus): P
     console.log(`[FirestoreService] updateOrderStatus: Successfully updated status for order ${orderId}.`);
     return true;
   } catch (error) {
-    console.error(`[FirestoreService] updateOrderStatus: Error updating status for order ${orderId} in '${docPath}':`, error);
+    console.error(`[FirestoreService] updateOrderStatus: Firebase error updating status for order ${orderId} in '${docPath}':`, error); // More specific logging
     return false;
   }
 }
@@ -311,10 +311,6 @@ export async function addUserProfileByAdmin(profileData: Omit<UserProfile, 'id' 
   const collectionPath = USERS_COLLECTION;
   console.log(`[FirestoreService] addUserProfileByAdmin: Attempting to create user profile by admin:`, profileData);
   try {
-    // Note: This does NOT create a Firebase Auth user. It only creates a profile document.
-    // If an ID is not provided, Firestore will auto-generate one.
-    // However, it's better if the admin form generates a unique ID or if this is linked to an auth UID later.
-    // For simplicity, let's auto-generate for now if not provided.
     const dataWithTimestamp = {
       ...profileData,
       createdAt: serverTimestamp(),
@@ -338,8 +334,8 @@ export async function getUsers(count?: number): Promise<UserProfile[]> {
     const users = querySnapshot.docs.map(docSnap => fromFirestore<UserProfile>(docSnap)).filter(u => u !== null) as UserProfile[];
     console.log(`[FirestoreService] getUsers: Successfully fetched ${users.length} user(s) from '${collectionPath}'.`);
     return users;
-  } catch (error) {
-    console.error(`[FirestoreService] getUsers: Error fetching users from '${collectionPath}'. Check Firestore permissions. Error details:`, error);
+  } catch (error: any) {
+    console.error(`[FirestoreService] getUsers: Error fetching users from '${collectionPath}'. Check Firestore permissions. Error details:`, error, "Message:", error.message, "Code:", error.code);
     return [];
   }
 }
