@@ -276,7 +276,7 @@ export async function getOrdersByUserId(userId: string): Promise<Order[]> {
   }
 }
 
-export async function updateOrderStatus(orderId: string, status: OrderStatus): Promise<boolean> {
+export async function updateOrderStatus(orderId: string, status: OrderStatus): Promise<void> {
   const docPath = `${ORDERS_COLLECTION}/${orderId}`;
   const dataToUpdate = { status: status, updatedAt: serverTimestamp() };
   console.log(`[FirestoreService] updateOrderStatus: Attempting to update status for order: '${docPath}' to '${status}'. Data:`, dataToUpdate);
@@ -284,16 +284,16 @@ export async function updateOrderStatus(orderId: string, status: OrderStatus): P
     const docRef = doc(db, ORDERS_COLLECTION, orderId);
     await updateDoc(docRef, dataToUpdate);
     console.log(`[FirestoreService] updateOrderStatus: Successfully updated status for order ${orderId}.`);
-    return true;
-  } catch (error: any) { // Catch specific Firebase errors or general errors
+    // No explicit return true needed, success is implied if no error is thrown
+  } catch (error: any) { 
     console.error(`[FirestoreService] updateOrderStatus: Firebase error updating status for order ${orderId} in '${docPath}'.`);
-    if (error.code) { // Firebase specific error
+    if (error.code) { 
       console.error(`Firebase Error Code: ${error.code}, Message: ${error.message}`);
-    } else { // General JavaScript error
+    } else { 
       console.error(`General Error: ${error.message}`, error);
     }
-    console.error("Full error object:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
-    return false;
+    console.error("Full error object from Firebase:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
+    throw error; // Re-throw the error to be caught by the server action
   }
 }
 
@@ -305,6 +305,10 @@ export async function addUserProfile(uid: string, email: string, displayName?: s
       email: email,
       displayName: displayName || null,
       createdAt: serverTimestamp(),
+      firstName: null, // Initialize optional fields
+      lastName: null,
+      phone: null,
+      photoURL: null,
     };
     await setDoc(doc(db, USERS_COLLECTION, uid), userProfileData);
     return true;
@@ -321,9 +325,14 @@ export async function addUserProfileByAdmin(profileData: Omit<UserProfile, 'id' 
     const dataWithTimestamp = {
       ...profileData,
       createdAt: serverTimestamp(),
+      // Ensure all optional fields from UserProfile are explicitly set or null
+      displayName: profileData.displayName || null,
+      firstName: profileData.firstName || null,
+      lastName: profileData.lastName || null,
+      phone: profileData.phone || null,
+      photoURL: null, 
     };
     const docRef = await addDoc(collection(db, collectionPath), dataWithTimestamp);
-    // Fetch the created doc to get the auto-generated ID and server-generated timestamp correctly
     const newDocSnap = await getDoc(docRef);
     return fromFirestore<UserProfile>(newDocSnap);
   } catch (error) {
@@ -361,5 +370,3 @@ export async function getUserById(userId: string): Promise<UserProfile | null> {
     return null;
   }
 }
-
-    

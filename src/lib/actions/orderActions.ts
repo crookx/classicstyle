@@ -13,7 +13,6 @@ const UpdateOrderStatusSchema = z.object({
   }),
 });
 
-// Ensure this interface is exported and matches what the client expects
 export interface OrderActionResult {
   success: boolean;
   error?: string;
@@ -25,7 +24,7 @@ export async function updateOrderStatusAction(formData: FormData): Promise<Order
   console.log("[OrderAction] Entered updateOrderStatusAction.");
   let actionResult: OrderActionResult;
 
-  try { // Super catch-all for the entire action
+  try {
     const rawData = {
       orderId: formData.get('orderId') as string,
       status: formData.get('status') as OrderStatus,
@@ -50,32 +49,33 @@ export async function updateOrderStatusAction(formData: FormData): Promise<Order
     const { orderId, status } = validation.data;
     console.log("[OrderAction] Validated data for update:", JSON.stringify({ orderId, status }));
 
-    const success = await updateOrderStatusInFirestore(orderId, status);
+    await updateOrderStatusInFirestore(orderId, status); // This will now throw on failure
 
-    if (success) {
-      console.log(`[OrderAction] Successfully updated status for order ${orderId} to ${status}. Revalidating paths.`);
-      revalidatePath('/admin/orders');
-      revalidatePath(`/admin/orders/${orderId}`);
-      actionResult = { success: true, orderId, newStatus: status };
-      console.log("[OrderAction] FINAL ACTION RESULT (Success):", JSON.stringify(actionResult));
-      return actionResult;
-    } else {
-      console.error(`[OrderAction] Firestore update failed for order ${orderId}. updateOrderStatusInFirestore returned false.`);
-      actionResult = { success: false, error: "Failed to update order status in the database.", orderId };
-      console.log("[OrderAction] FINAL ACTION RESULT (Firestore Update Failure):", JSON.stringify(actionResult));
-      return actionResult;
-    }
-  } catch (error: unknown) { // Catch any unexpected error during the action's execution
-    console.error("[OrderAction] Unexpected error in updateOrderStatusAction:", error);
-    let errorMessage = "An unknown server error occurred during action execution.";
+    console.log(`[OrderAction] Successfully updated status for order ${orderId} to ${status}. Revalidating paths.`);
+    revalidatePath('/admin/orders');
+    revalidatePath(`/admin/orders/${orderId}`);
+    actionResult = { success: true, orderId, newStatus: status };
+    console.log("[OrderAction] FINAL ACTION RESULT (Success):", JSON.stringify(actionResult));
+    return actionResult;
+
+  } catch (error: unknown) { // Catch errors from updateOrderStatusInFirestore or other unexpected issues
+    console.error("[OrderAction] Error during order status update process:", error);
+    let errorMessage = "An unexpected server error occurred while updating status.";
     if (error instanceof Error) {
-        errorMessage = error.message;
+        errorMessage = error.message; // This will now include the specific Firebase error
     } else if (typeof error === 'string') {
         errorMessage = error;
     }
-    actionResult = { success: false, error: `Server action error: ${errorMessage}` };
-    console.log("[OrderAction] FINAL ACTION RESULT (Caught Exception):", JSON.stringify(actionResult));
+    
+    // Extract orderId if available from formData for better error reporting
+    const orderIdFromForm = formData.get('orderId') as string | undefined;
+
+    actionResult = { 
+        success: false, 
+        error: errorMessage, 
+        orderId: orderIdFromForm 
+    };
+    console.log("[OrderAction] FINAL ACTION RESULT (Caught Exception in Action):", JSON.stringify(actionResult));
     return actionResult;
   }
 }
-
