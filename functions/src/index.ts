@@ -5,9 +5,6 @@ import Stripe from "stripe";
 import express = require("express");
 import cors = require("cors");
 
-// Define a more specific type for order items if not importing from shared types
-// Removed FirebaseOrderItem as it was unused
-
 // Initialize Firebase Admin SDK only once
 if (!admin.apps.length) {
   admin.initializeApp();

@@ -97,8 +97,11 @@ export async function getFeaturedProducts(count: number = 6): Promise<Product[]>
   console.log(`[FirestoreService] getFeaturedProducts: Attempting to read from collection: '${collectionPath}' with 'isFeatured' filter.`);
   try {
     const productsRef = collection(db, collectionPath);
-    const q = query(productsRef, where('isFeatured', '==', true), orderBy("createdAt", "desc"), limit(count));
+    // Simplified query: removed orderBy("createdAt", "desc") to avoid immediate index requirement for build.
+    // For production, add the composite index (isFeatured ASC, createdAt DESC) and re-add orderBy.
+    const q = query(productsRef, where('isFeatured', '==', true), limit(count));
     const querySnapshot = await getDocs(q);
+    console.log(`[FirestoreService] getFeaturedProducts: Successfully fetched ${querySnapshot.docs.length} featured product(s).`);
     return querySnapshot.docs.map(docSnap => fromFirestore<Product>(docSnap)).filter(p => p !== null) as Product[];
   } catch (error) {
     console.error(`[FirestoreService] getFeaturedProducts: Error fetching featured products from '${collectionPath}':`, error);
@@ -298,31 +301,27 @@ export async function getOrdersByUserId(userId: string): Promise<Order[]> {
   }
 }
 
-// Note: updateOrderStatus is now primarily handled by server action using Admin SDK for permissions.
-// This client-side version might be useful for optimistic updates if rules allowed user to update their own order status, but that's not the case here.
-// For now, it's effectively replaced by the server action. I'll keep it commented for reference.
-/*
-export async function updateOrderStatusInFirestore(orderId: string, status: OrderStatus): Promise<boolean> {
+export async function updateOrderStatus(orderId: string, status: OrderStatus): Promise<boolean> {
   const docPath = `${ORDERS_COLLECTION}/${orderId}`;
   const dataToUpdate = { status: status, updatedAt: serverTimestamp() };
-  console.log(`[FirestoreService] updateOrderStatusInFirestore (Client SDK): Attempting to update status for order: '${docPath}' to '${status}'.`);
+  console.log(`[FirestoreService] updateOrderStatus (Client SDK side, for admin action via Admin SDK): Attempting to update status for order: '${docPath}' to '${status}'.`);
   try {
     const docRef = doc(db, ORDERS_COLLECTION, orderId);
     await updateDoc(docRef, dataToUpdate);
-    console.log(`[FirestoreService] updateOrderStatusInFirestore (Client SDK): Successfully updated status for order ${orderId}.`);
+    console.log(`[FirestoreService] updateOrderStatus: Successfully updated status for order ${orderId}.`);
     return true;
   } catch (error: any) {
-    console.error(`[FirestoreService] updateOrderStatusInFirestore (Client SDK): Firebase error updating status for order ${orderId}.`);
+    console.error(`[FirestoreService] updateOrderStatus: Firebase error updating status for order ${orderId} in '${docPath}':`, error);
     if (error.code) {
-      console.error(`Firebase Error Code: ${error.code}, Message: ${error.message}`);
+      console.error(`[FirestoreService] Firebase Error Code: ${error.code}, Message: ${error.message}`);
     } else {
-      console.error(`General Error: ${error.message}`, error);
+      console.error(`[FirestoreService] General Error: ${error.message}`, error);
     }
-    console.error("Full error object from Firebase:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
-    throw error; // Re-throw to be caught by the server action or calling function
+    console.error("[FirestoreService] Full error object from Firebase:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
+    throw error; // Re-throw to be caught by the server action
   }
 }
-*/
+
 
 export async function addUserProfile(uid: string, email: string, displayName?: string | null): Promise<boolean> {
   const docPath = `${USERS_COLLECTION}/${uid}`;
