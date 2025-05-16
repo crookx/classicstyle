@@ -1,9 +1,11 @@
+
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion"
+import { Button } from "@/components/ui/button"; // Added missing import
 
 const faqs = [
   {
@@ -12,7 +14,7 @@ const faqs = [
   },
   {
     question: "What is your return policy?",
-    answer: "We accept returns on unworn, unwashed items with tags attached within 30 days of purchase. Please visit our Shipping &amp; Returns page for detailed instructions on how to initiate a return."
+    answer: "We accept returns on unworn, unwashed items with tags attached within 30 days of purchase. Please visit our Shipping & Returns page for detailed instructions on how to initiate a return."
   },
   {
     question: "How can I track my order?",

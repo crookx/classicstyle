@@ -6,14 +6,7 @@ import express = require("express");
 import cors = require("cors");
 
 // Define a more specific type for order items if not importing from shared types
-interface FirebaseOrderItem {
-  productId: string;
-  name: string;
-  quantity: number;
-  price: number;
-  imageUrl?: string;
-}
-
+// Removed FirebaseOrderItem as it was unused
 
 // Initialize Firebase Admin SDK only once
 if (!admin.apps.length) {
@@ -35,7 +28,7 @@ let stripeInstance: Stripe | null = null;
 
 if (stripeSecretKey) {
   stripeInstance = new Stripe(stripeSecretKey, {
-    apiVersion: "2024-06-20", // Use the same API version as your app
+    apiVersion: "2023-10-16", // Matched to common SDK expectations
     typescript: true,
   });
 } else {
@@ -77,7 +70,7 @@ app.post(
 
     try {
       event = stripeInstance.webhooks.constructEvent(req.body, sig, webhookSecret);
-    } catch (err: unknown) { // Changed from err: any
+    } catch (err: unknown) {
       let message = "An unknown error occurred during webhook signature verification.";
       if (err instanceof Error) {
         message = err.message;
@@ -112,15 +105,11 @@ app.post(
           functions.logger.warn(
             `No order found with paymentIntentId: ${paymentIntent.id} for succeeded event. This might mean client-side order creation failed or was delayed.`,
           );
-          // TODO: Consider creating a new order here if critical, or alerting.
-          // This depends on your business logic for handling such discrepancies.
         } else {
           querySnapshot.forEach(async (doc) => {
             functions.logger.info(
               `Updating order ${doc.id} status to 'Processing' due to payment_intent.succeeded.`,
             );
-            // Update order status to 'Processing' or 'Pending' based on your flow.
-            // If the client already set it to 'Pending', you might just confirm or move to 'Processing'.
             await doc.ref.update({
               status: "Processing",
               updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -169,47 +158,34 @@ app.post(
       }
       break;
     }
-    // Add more event types as needed
-    // case 'charge.succeeded':
-    //   // Handle charge.succeeded
-    //   break;
-    // case 'customer.subscription.created':
-    //   // Handle subscription creation
-    //   break;
     default:
       functions.logger.info(`Unhandled event type: ${event.type}`);
     }
 
-    // Return a response to acknowledge receipt of the event
     res.status(200).json({ received: true });
   },
 );
 
-// Expose Express API as a single Cloud Function:
-export const webhooks = functions.region("us-central1").https.onRequest(app); // Specify region if needed
+export const webhooks = functions.region("us-central1").https.onRequest(app);
 
-// --- Example of an Order Confirmation Email (Illustrative, if you want to trigger from here) ---
-// You might have this triggered by client or another function.
-// const STORE_NAME = "ClassicStyle eStore";
-// const SUPPORT_EMAIL = "support@classicstyle.com";
-// const STORE_PRIMARY_COLOR = "#DAA520";
+// Illustrative Email Functions (Conceptual - for future email service integration)
+// const STORE_NAME_EMAIL = "ClassicStyle eStore";
+// const SUPPORT_EMAIL_CONTACT = "support@classicstyle.com";
+// const STORE_PRIMARY_COLOR_EMAIL = "#DAA520";
 
-// export const onNewOrderSendConfirmationEmail = functions.firestore
+// export const onNewOrderSendConfirmationEmailIllustrative = functions.firestore
 //   .document("orders/{orderId}")
 //   .onCreate(async (snap) => {
 //     const orderData = snap.data();
 //     if (!orderData || !orderData.customerEmail) {
-//       functions.logger.error("Order data or customerEmail missing.");
+//       functions.logger.error("Order data or customerEmail missing for illustrative email.");
 //       return null;
 //     }
-//     // ... (rest of your email sending logic using SendGrid or other service)
-//     functions.logger.info(`Simulating order confirmation email for ${orderData.customerEmail}`);
+//     functions.logger.info(`ILLUSTRATIVE: Order confirmation email for ${orderData.customerEmail}`);
 //     return null;
 //   });
 
-// --- Welcome Email on New User Signup ---
-// export const onNewUserSendWelcomeEmail = functions.auth.user().onCreate(async (user) => {
+// export const onNewUserSendWelcomeEmailIllustrative = functions.auth.user().onCreate(async (user) => {
 //   const email = user.email;
-//   // ... (rest of your welcome email logic)
-//   functions.logger.info(`Simulating welcome email for ${email}`);
+//   functions.logger.info(`ILLUSTRATIVE: Welcome email for ${email}`);
 // });
