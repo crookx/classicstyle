@@ -1,7 +1,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Users, MoreVertical, Mail, ShoppingBag, UserCircle } from "lucide-react";
+import { Users, MoreVertical, Mail, ShoppingBag, UserCircle, AlertTriangle } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -87,7 +87,11 @@ export default async function AdminCustomersPage() {
              <div className="text-center py-12 text-muted-foreground">
                 <Users className="h-16 w-16 mx-auto mb-4 opacity-50" />
                 <p className="text-lg">No customers found.</p>
-                <p>Ensure users have signed up and their profiles are being created in Firestore.</p>
+                <p className="flex items-center justify-center text-amber-600">
+                  <AlertTriangle className="mr-2 h-5 w-5" /> 
+                  Ensure Firestore security rules allow 'list' access to the 'users' collection.
+                </p>
+                <p>New users will appear here after they sign up.</p>
             </div>
           )}
         </CardContent>
