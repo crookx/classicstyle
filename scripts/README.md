@@ -50,10 +50,8 @@ This script is used to populate your Firebase Firestore database with initial pr
 3.  Execute the script using the following command:
 
     ```bash
-    npx ts-node --esm ./scripts/populateFirestore.ts
+    node --loader ts-node/esm ./scripts/populateFirestore.ts
     ```
-
-    (The `--esm` flag is important if your `tsconfig.json` has `"module": "esnext"` or similar for ES Module support, which is common in modern Next.js projects).
 
 4.  The script will log its progress to the console. Upon successful completion, your `products` and `collections` collections in Firestore should be populated.
 
@@ -62,3 +60,5 @@ This script is used to populate your Firebase Firestore database with initial pr
 *   The script uses batch writes to upload data efficiently.
 *   If you run the script multiple times, it will overwrite existing documents if they have the same ID, or create new ones if the IDs are different. The current script uses predefined IDs from `mock-data.ts`.
 *   The `databaseURL` in `populateFirestore.ts` should match your Firebase project's database URL (usually `https://<YOUR_PROJECT_ID>.firebaseio.com` or `https://<YOUR_PROJECT_ID>.firestore.io`). The script currently has a placeholder for `clothstore-25546`.
+*   The `serviceAccount` import in `populateFirestore.ts` is cast to `admin.ServiceAccount` to satisfy TypeScript, as direct JSON imports sometimes don't carry precise type information for complex objects.
+*   Batches are re-initialized after each commit to prevent errors with using an already committed batch.
