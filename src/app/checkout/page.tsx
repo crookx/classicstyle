@@ -55,23 +55,31 @@ interface OrderDetailsForEmail {
     country: string;
     postalCode: string;
   };
-  estimatedDelivery?: string; // Placeholder for now
+  estimatedDelivery?: string; 
 }
 
-// Placeholder function to simulate sending an order confirmation email
+// Placeholder function to simulate initiating an order confirmation email process
+// In a real app, this would likely call a backend API (e.g., a Firebase Cloud Function).
 async function initiateOrderConfirmationEmail(orderDetails: OrderDetailsForEmail) {
-  console.log('--- SIMULATING ORDER CONFIRMATION EMAIL ---');
-  console.log('To:', orderDetails.customerEmail);
-  console.log('Subject: Thank you for your order, ' + orderDetails.customerName + '! 🎉 Order #' + orderDetails.orderNumber + ' confirmed.');
-  console.log('Body would contain:');
-  console.log('  Order Summary:', orderDetails.items.map(item => `${item.name} (Qty: ${item.quantity}) - KSh ${(item.price * item.quantity).toFixed(2)}`).join(', '));
-  console.log('  Total Amount: KSh', orderDetails.totalAmount.toFixed(2));
-  console.log('  Shipping To:', orderDetails.shippingAddress);
-  console.log('  Estimated Delivery:', orderDetails.estimatedDelivery || '3-5 business days');
-  console.log('--- END OF SIMULATION ---');
-  // In a real application, this function would make an API call to your backend
-  // which then uses an email service (SendGrid, Mailgun, etc.) to send the actual email.
-  // Example: await fetch('/api/send-order-confirmation', { method: 'POST', body: JSON.stringify(orderDetails) });
+  console.log('--- SIMULATING INITIATION OF ORDER CONFIRMATION EMAIL ---');
+  console.log('Order Details Prepared:', orderDetails);
+  console.log('Next Step: Call a backend API/Cloud Function to process and send the actual email using an email service.');
+  // Example:
+  // try {
+  //   const response = await fetch('/api/send-order-confirmation', { // Your backend API endpoint
+  //     method: 'POST',
+  //     headers: { 'Content-Type': 'application/json' },
+  //     body: JSON.stringify(orderDetails),
+  //   });
+  //   if (!response.ok) {
+  //     console.error('Failed to trigger order confirmation email:', await response.text());
+  //   } else {
+  //     console.log('Order confirmation email trigger successful.');
+  //   }
+  // } catch (error) {
+  //   console.error('Error triggering order confirmation email:', error);
+  // }
+  console.log('--- END OF ORDER CONFIRMATION SIMULATION ---');
 }
 
 
@@ -117,13 +125,14 @@ export default function CheckoutPage() {
 
     // This is a mock order placement.
     // In a real app, you would save the order to your database here.
+    // This saving action itself would trigger the onNewOrderSendConfirmationEmail Cloud Function.
     const mockOrderNumber = `CS${Date.now().toString().slice(-6)}`;
 
     const orderDetailsForEmail: OrderDetailsForEmail = {
       orderNumber: mockOrderNumber,
       customerName: `${values.firstName} ${values.lastName}`,
       customerEmail: values.email,
-      items: cart, // Assuming cart items have all necessary details
+      items: cart, 
       totalAmount: totalPrice,
       shippingAddress: {
         firstName: values.firstName,
@@ -134,16 +143,18 @@ export default function CheckoutPage() {
         country: values.country,
         postalCode: values.postalCode,
       },
-      // Estimated delivery could be calculated based on shipping method, etc.
       estimatedDelivery: "3-5 business days (Kenya)",
     };
 
-    // Simulate sending the order confirmation email
+    // In a real application, saving the order to Firestore would trigger the
+    // onNewOrderSendConfirmationEmail Cloud Function automatically.
+    // This call here is just to simulate the data that *would* be available
+    // and what the frontend *might* do if it needed to directly initiate something (less common for this email).
     await initiateOrderConfirmationEmail(orderDetailsForEmail);
 
     toast({
       title: "Order Placed!",
-      description: `Thank you for your purchase, ${values.firstName}! Your order #${mockOrderNumber} is being processed. A confirmation email has been simulated (check console).`,
+      description: `Thank you for your purchase, ${values.firstName}! Your order #${mockOrderNumber} is being processed. An order confirmation email process has been simulated (check console).`,
     });
 
     clearCart();
@@ -207,17 +218,17 @@ export default function CheckoutPage() {
                   )}
                 />
                 <div className="grid sm:grid-cols-2 gap-4">
-                  <FormField name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-                  <FormField name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                  <FormField control={form.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                  <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
                 </div>
-                <FormField name="address" render={({ field }) => ( <FormItem><FormLabel>Address</FormLabel><FormControl><Input placeholder="123 Main St" {...field} /></FormControl><FormMessage /></FormItem> )} />
-                <FormField name="apartment" render={({ field }) => ( <FormItem><FormLabel>Apartment, suite, etc. (optional)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                <FormField control={form.control} name="address" render={({ field }) => ( <FormItem><FormLabel>Address</FormLabel><FormControl><Input placeholder="123 Main St" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                <FormField control={form.control} name="apartment" render={({ field }) => ( <FormItem><FormLabel>Apartment, suite, etc. (optional)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
                 <div className="grid sm:grid-cols-3 gap-4">
-                  <FormField name="city" render={({ field }) => ( <FormItem><FormLabel>City</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-                  <FormField name="country" render={({ field }) => ( <FormItem><FormLabel>Country</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-                  <FormField name="postalCode" render={({ field }) => ( <FormItem><FormLabel>Postal Code</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                  <FormField control={form.control} name="city" render={({ field }) => ( <FormItem><FormLabel>City</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                  <FormField control={form.control} name="country" render={({ field }) => ( <FormItem><FormLabel>Country</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                  <FormField control={form.control} name="postalCode" render={({ field }) => ( <FormItem><FormLabel>Postal Code</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
                 </div>
-                <FormField name="phone" render={({ field }) => ( <FormItem><FormLabel>Phone (optional)</FormLabel><FormControl><Input type="tel" {...field} /></FormControl><FormDescription>For shipping updates.</FormDescription><FormMessage /></FormItem> )} />
+                <FormField control={form.control} name="phone" render={({ field }) => ( <FormItem><FormLabel>Phone (optional)</FormLabel><FormControl><Input type="tel" {...field} /></FormControl><FormDescription>For shipping updates.</FormDescription><FormMessage /></FormItem> )} />
               </CardContent>
             </Card>
 
@@ -226,11 +237,11 @@ export default function CheckoutPage() {
                     <CardTitle className="text-2xl font-serif">Payment Details</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <FormField name="cardholderName" render={({ field }) => ( <FormItem><FormLabel>Name on Card</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-                    <FormField name="cardNumber" render={({ field }) => ( <FormItem><FormLabel>Card Number</FormLabel><FormControl><Input placeholder="•••• •••• •••• ••••" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                    <FormField control={form.control} name="cardholderName" render={({ field }) => ( <FormItem><FormLabel>Name on Card</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                    <FormField control={form.control} name="cardNumber" render={({ field }) => ( <FormItem><FormLabel>Card Number</FormLabel><FormControl><Input placeholder="•••• •••• •••• ••••" {...field} /></FormControl><FormMessage /></FormItem> )} />
                     <div className="grid sm:grid-cols-2 gap-4">
-                        <FormField name="expiryDate" render={({ field }) => ( <FormItem><FormLabel>Expiry Date</FormLabel><FormControl><Input placeholder="MM/YY" {...field} /></FormControl><FormMessage /></FormItem> )} />
-                        <FormField name="cvc" render={({ field }) => ( <FormItem><FormLabel>CVC</FormLabel><FormControl><Input placeholder="123" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                        <FormField control={form.control} name="expiryDate" render={({ field }) => ( <FormItem><FormLabel>Expiry Date</FormLabel><FormControl><Input placeholder="MM/YY" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                        <FormField control={form.control} name="cvc" render={({ field }) => ( <FormItem><FormLabel>CVC</FormLabel><FormControl><Input placeholder="123" {...field} /></FormControl><FormMessage /></FormItem> )} />
                     </div>
                 </CardContent>
             </Card>
@@ -287,5 +298,6 @@ export default function CheckoutPage() {
     </div>
   );
 }
+    
 
     
