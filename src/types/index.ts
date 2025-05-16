@@ -34,7 +34,6 @@ export interface Collection {
   productIds: string[];
 }
 
-// New Order Types
 export interface OrderItem {
   productId: string;
   name: string; // Product name at the time of order
@@ -43,21 +42,33 @@ export interface OrderItem {
   imageUrl?: string | null; // Optional image for quick view in order summary
 }
 
+export type OrderStatus = 'Pending' | 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled';
+
 export interface Order {
   id: string; // Firestore document ID
   customerName: string;
   customerEmail: string;
-  orderDate: string; // Consider using Firestore Timestamp for real apps for better querying/sorting
+  userId?: string | null; // To link to the user in Firebase Auth / users collection
+  orderDate: string | any; // Stored as string from mock, but Firestore Timestamp preferred
   totalAmount: number;
-  status: 'Pending' | 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled';
+  status: OrderStatus;
   items: OrderItem[];
-  shippingAddress?: { // Optional, can be expanded
+  shippingAddress?: {
     address: string;
     city: string;
     postalCode: string;
     country: string;
   } | null;
-  // Firebase Timestamps can be added here if needed:
-  // createdAt?: any; // Firebase Timestamp type
-  // updatedAt?: any; // Firebase Timestamp type
+  // Timestamps for better tracking
+  createdAt?: any; // Firebase Timestamp type
+  updatedAt?: any; // Firebase Timestamp type
+}
+
+export interface UserProfile {
+  id: string; // Corresponds to Firebase Auth UID
+  email: string;
+  displayName?: string | null;
+  photoURL?: string | null;
+  createdAt: any; // Firestore Timestamp
+  // Add other profile fields as needed, e.g., role, address, phone
 }

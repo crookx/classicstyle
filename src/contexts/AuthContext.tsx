@@ -10,7 +10,8 @@ import {
   signInWithEmailAndPassword, 
   signOut as firebaseSignOut 
 } from 'firebase/auth';
-import { auth } from '@/lib/firebase'; // Assuming your firebase init file is here
+import { auth } from '@/lib/firebase';
+import { addUserProfile } from '@/lib/firebase/firestoreService'; // Import addUserProfile
 
 interface AuthContextType {
   currentUser: User | null;
@@ -31,18 +32,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setCurrentUser(user);
       setLoading(false);
     });
-    return unsubscribe; // Cleanup subscription on unmount
+    return unsubscribe; 
   }, []);
 
   const signup = async (email: string, password: string): Promise<User | null> => {
     setLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      setCurrentUser(userCredential.user);
-      return userCredential.user;
+      if (userCredential.user) {
+        // Create a user profile in Firestore
+        await addUserProfile(userCredential.user.uid, userCredential.user.email || email, userCredential.user.displayName);
+        setCurrentUser(userCredential.user);
+        return userCredential.user;
+      }
+      return null;
     } catch (error) {
       console.error("Error signing up:", error);
-      // You might want to throw the error or handle it more gracefully
       throw error;
     } finally {
       setLoading(false);
@@ -84,6 +89,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     logout,
   };
 
+  // Render children only when loading is false to prevent flash of unauthenticated content
   return <AuthContext.Provider value={value}>{!loading && children}</AuthContext.Provider>;
 };
 

@@ -7,102 +7,115 @@ import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import type { Product, ProductColor } from '@/types';
-import { addProductAction } from '@/lib/actions/productActions'; 
+import { addProductAction, updateProductAction } from '@/lib/actions/productActions'; 
 import { useRouter } from 'next/navigation';
 import { Checkbox } from '../ui/checkbox';
 import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 
-
-const productFormSchema = z.object({
+// Base schema without ID, used for validation and transformation
+const productFormSchemaBase = z.object({
   name: z.string().min(3, { message: "Product name must be at least 3 characters." }),
   price: z.coerce.number().positive({ message: "Price must be a positive number." }),
-  originalPrice: z.coerce.number().optional().default(0).transform(val => val || undefined), 
+  originalPrice: z.coerce.number().optional().transform(val => val || undefined), // Store as undefined if empty
   imageUrl: z.string().url({ message: "Please enter a valid image URL." }).or(z.literal('')),
   dataAiHint: z.string().optional(),
   category: z.string().min(2, { message: "Category is required." }),
   subCategory: z.string().optional(),
   description: z.string().min(10, { message: "Description must be at least 10 characters." }),
-  details: z.string().optional(), 
-  colors: z.string().optional(), 
-  sizes: z.string().optional(), 
-  tags: z.string().optional(), 
+  details: z.string().optional(), // Comma or newline separated string for input
+  colors: z.string().optional(), // Format: Name1:HEX1,Name2:HEX2
+  sizes: z.string().optional(),  // Comma separated string
+  tags: z.string().optional(),   // Comma separated string
   sku: z.string().optional(),
   isFeatured: z.boolean().default(false).optional(),
 });
 
-type ProductFormValues = z.infer<typeof productFormSchema>;
+// For the form, we don't necessarily need the ID for validation if it's handled by initialData
+type ProductFormValues = z.infer<typeof productFormSchemaBase>;
 
 interface ProductFormProps {
-  initialData?: Product; 
+  productToEdit?: Product | null; 
 }
 
-export default function ProductForm({ initialData }: ProductFormProps) {
+export default function ProductForm({ productToEdit }: ProductFormProps) {
   const { toast } = useToast();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const isEditMode = !!productToEdit;
+
+  const defaultValues: ProductFormValues = productToEdit ? {
+    name: productToEdit.name || '',
+    price: productToEdit.price || 0,
+    originalPrice: productToEdit.originalPrice || undefined,
+    imageUrl: productToEdit.imageUrl || '',
+    dataAiHint: productToEdit.dataAiHint || '',
+    category: productToEdit.category || '',
+    subCategory: productToEdit.subCategory || '',
+    description: productToEdit.description || '',
+    details: productToEdit.details?.join('\\n') || '', // Join by newline for textarea
+    colors: productToEdit.colors?.map(c => `${c.name}:${c.hex}`).join(', ') || '',
+    sizes: productToEdit.sizes?.join(', ') || '',
+    tags: productToEdit.tags?.join(', ') || '',
+    sku: productToEdit.sku || '',
+    isFeatured: productToEdit.isFeatured || false,
+  } : {
+    name: '',
+    price: 0,
+    originalPrice: undefined,
+    imageUrl: '',
+    dataAiHint: '',
+    category: '',
+    subCategory: '',
+    description: '',
+    details: '',
+    colors: '',
+    sizes: '',
+    tags: '',
+    sku: '',
+    isFeatured: false,
+  };
+  
   const form = useForm<ProductFormValues>({
-    resolver: zodResolver(productFormSchema),
-    defaultValues: initialData ? {
-      ...initialData,
-      price: initialData.price || 0,
-      originalPrice: initialData.originalPrice || undefined,
-      details: initialData.details?.join('\\n') || '',
-      colors: initialData.colors?.map(c => `${c.name}:${c.hex}`).join(', ') || '',
-      sizes: initialData.sizes?.join(', ') || '',
-      tags: initialData.tags?.join(', ') || '',
-      isFeatured: initialData.isFeatured || false,
-    } : {
-      name: '',
-      price: 0,
-      originalPrice: undefined,
-      imageUrl: '',
-      dataAiHint: '',
-      category: '',
-      subCategory: '',
-      description: '',
-      details: '',
-      colors: '',
-      sizes: '',
-      tags: '',
-      sku: '',
-      isFeatured: false,
-    },
+    resolver: zodResolver(productFormSchemaBase),
+    defaultValues: defaultValues,
   });
 
   async function onSubmit(data: ProductFormValues) {
     setIsSubmitting(true);
+    
+    const submissionData = isEditMode && productToEdit ? { ...data, id: productToEdit.id } : data;
+    
     try {
-      const productData: Partial<Product> = {
-        ...data,
-        details: data.details?.split('\\n').map(d => d.trim()).filter(d => d) || [],
-        colors: data.colors?.split(',').map(c => {
-          const parts = c.split(':');
-          return { name: parts[0]?.trim(), hex: parts[1]?.trim() };
-        }).filter(c => c.name && c.hex) as ProductColor[] || [],
-        sizes: data.sizes?.split(',').map(s => s.trim()).filter(s => s) || [],
-        tags: data.tags?.split(',').map(t => t.trim()).filter(t => t) || [],
-      };
-      
-      const result = await addProductAction(productData as Omit<Product, 'id' | 'rating' | 'reviewCount'>);
+      const result = isEditMode 
+        ? await updateProductAction(submissionData) 
+        : await addProductAction(submissionData);
 
-      if (result.success && result.product) {
+      if (result.success && result.data) {
         toast({
-          title: "Product Added!",
-          description: `${result.product.name} has been successfully added.`,
+          title: isEditMode ? "Product Updated!" : "Product Added!",
+          description: `${result.data.name} has been successfully ${isEditMode ? 'updated' : 'added'}.`,
         });
         router.push('/admin/products'); 
+        router.refresh(); // Ensure the product list page re-fetches
       } else {
         toast({
           title: "Error",
-          description: result.error || "Failed to add product.",
+          description: result.error || `Failed to ${isEditMode ? 'update' : 'add'} product.`,
           variant: "destructive",
         });
+         if (result.fieldErrors) {
+          // Optionally set form errors if using react-hook-form's error display
+          Object.entries(result.fieldErrors).forEach(([field, errors]) => {
+            if (errors && errors.length > 0) {
+              form.setError(field as keyof ProductFormValues, { type: 'manual', message: errors.join(', ') });
+            }
+          });
+        }
       }
     } catch (error) {
       console.error("Product form submission error:", error);
@@ -137,7 +150,7 @@ export default function ProductForm({ initialData }: ProductFormProps) {
             <FormItem><FormLabel>Price (KSh)</FormLabel><FormControl><Input type="number" step="0.01" placeholder="e.g., 1500.00" {...field} /></FormControl><FormMessage /></FormItem>
           )} />
           <FormField control={form.control} name="originalPrice" render={({ field }) => (
-            <FormItem><FormLabel>Original Price (KSh) (Optional)</FormLabel><FormControl><Input type="number" step="0.01" placeholder="e.g., 2000.00" {...field} /></FormControl><FormDescription>If the product is on sale.</FormDescription><FormMessage /></FormItem>
+            <FormItem><FormLabel>Original Price (KSh) (Optional)</FormLabel><FormControl><Input type="number" step="0.01" placeholder="e.g., 2000.00" {...field} value={field.value ?? ''} /></FormControl><FormDescription>If the product is on sale.</FormDescription><FormMessage /></FormItem>
           )} />
         </div>
         
@@ -146,7 +159,7 @@ export default function ProductForm({ initialData }: ProductFormProps) {
             <FormItem><FormLabel>Category</FormLabel><FormControl><Input placeholder="e.g., Accessories" {...field} /></FormControl><FormMessage /></FormItem>
           )} />
           <FormField control={form.control} name="subCategory" render={({ field }) => (
-            <FormItem><FormLabel>Sub-Category (Optional)</FormLabel><FormControl><Input placeholder="e.g., Scarves" {...field} /></FormControl><FormMessage /></FormItem>
+            <FormItem><FormLabel>Sub-Category (Optional)</FormLabel><FormControl><Input placeholder="e.g., Scarves" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
           )} />
         </div>
 
@@ -154,23 +167,23 @@ export default function ProductForm({ initialData }: ProductFormProps) {
           <FormItem><FormLabel>Image URL</FormLabel><FormControl><Input placeholder="https://placehold.co/600x800.png" {...field} /></FormControl><FormMessage /></FormItem>
         )} />
         <FormField control={form.control} name="dataAiHint" render={({ field }) => (
-          <FormItem><FormLabel>Image AI Hint (Optional)</FormLabel><FormControl><Input placeholder="e.g., silk scarf pattern" {...field} /></FormControl><FormDescription>Keywords for AI image search if placeholder is used.</FormDescription><FormMessage /></FormItem>
+          <FormItem><FormLabel>Image AI Hint (Optional)</FormLabel><FormControl><Input placeholder="e.g., silk scarf pattern" {...field} value={field.value ?? ''} /></FormControl><FormDescription>Keywords for AI image search if placeholder is used.</FormDescription><FormMessage /></FormItem>
         )} />
 
         <FormField control={form.control} name="details" render={({ field }) => (
-          <FormItem><FormLabel>Product Details (Optional)</FormLabel><FormControl><Textarea placeholder="100% Mulberry Silk&#x0A;Hand-rolled edges&#x000A;Made in Kenya" {...field} rows={4} /></FormControl><FormDescription>Enter each detail on a new line.</FormDescription><FormMessage /></FormItem>
+          <FormItem><FormLabel>Product Details (Optional)</FormLabel><FormControl><Textarea placeholder="100% Mulberry Silk\\nHand-rolled edges\\nMade in Kenya" {...field} rows={4} value={field.value ?? ''} /></FormControl><FormDescription>Enter each detail on a new line (use \\n for new lines).</FormDescription><FormMessage /></FormItem>
         )} />
         
         <FormField control={form.control} name="colors" render={({ field }) => (
-          <FormItem><FormLabel>Colors (Optional)</FormLabel><FormControl><Input placeholder="e.g., Ruby Red:#E0115F, Emerald Green:#50C878" {...field} /></FormControl><FormDescription>Comma-separated, format: Name:HEX (e.g., Blue:#0000FF, Green:#00FF00).</FormDescription><FormMessage /></FormItem>
+          <FormItem><FormLabel>Colors (Optional)</FormLabel><FormControl><Input placeholder="e.g., Ruby Red:#E0115F, Emerald Green:#50C878" {...field} value={field.value ?? ''} /></FormControl><FormDescription>Comma-separated, format: Name:HEX (e.g., Blue:#0000FF, Green:#00FF00).</FormDescription><FormMessage /></FormItem>
         )} />
         
         <FormField control={form.control} name="sizes" render={({ field }) => (
-          <FormItem><FormLabel>Sizes (Optional)</FormLabel><FormControl><Input placeholder="S, M, L, XL" {...field} /></FormControl><FormDescription>Comma-separated values (e.g., S, M, L, 30W, 32W).</FormDescription><FormMessage /></FormItem>
+          <FormItem><FormLabel>Sizes (Optional)</FormLabel><FormControl><Input placeholder="S, M, L, XL" {...field} value={field.value ?? ''} /></FormControl><FormDescription>Comma-separated values (e.g., S, M, L, 30W, 32W).</FormDescription><FormMessage /></FormItem>
         )} />
 
         <FormField control={form.control} name="tags" render={({ field }) => (
-          <FormItem><FormLabel>Tags (Optional)</FormLabel><FormControl><Input placeholder="e.g., silk, luxury, gift, featured" {...field} /></FormControl><FormDescription>Comma-separated values.</FormDescription><FormMessage /></FormItem>
+          <FormItem><FormLabel>Tags (Optional)</FormLabel><FormControl><Input placeholder="e.g., silk, luxury, gift, featured" {...field} value={field.value ?? ''} /></FormControl><FormDescription>Comma-separated values.</FormDescription><FormMessage /></FormItem>
         )} />
         
         <FormField
@@ -199,11 +212,11 @@ export default function ProductForm({ initialData }: ProductFormProps) {
         <div className="flex justify-end">
           <Button type="submit" size="lg" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
-            {isSubmitting ? 'Saving...' : (initialData ? 'Save Changes' : 'Add Product')}
+            {isSubmitting ? 'Saving...' : (isEditMode ? 'Save Changes' : 'Add Product')}
           </Button>
         </div>
         <p className="text-sm text-muted-foreground text-center">
-            Note: Product data is managed in Firestore.
+            Product data is managed in Firestore.
         </p>
       </form>
     </Form>

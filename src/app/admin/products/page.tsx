@@ -6,8 +6,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { getProducts } from '@/lib/firebase/firestoreService';
 import type { Product } from '@/types';
 import Image from 'next/image';
-import { PlusCircle, Edit, Trash2, Eye } from 'lucide-react';
+import { PlusCircle, Edit, Eye } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import DeleteProductButton from '@/components/admin/DeleteProductButton'; // New component
 
 export default async function AdminProductsPage() {
   const products: Product[] = await getProducts(); 
@@ -74,14 +75,11 @@ export default async function AdminProductsPage() {
                         </Button>
                       </Link>
                       <Link href={`/admin/products/${product.id}/edit`} passHref legacyBehavior>
-                        <Button variant="ghost" size="icon" asChild title="Edit Product (coming soon)" disabled>
+                        <Button variant="ghost" size="icon" asChild title="Edit Product">
                            <a><Edit className="h-4 w-4" /></a>
                         </Button>
                       </Link>
-                      <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive hover:bg-destructive/10" disabled title="Delete Product (coming soon)">
-                        <Trash2 className="h-4 w-4" />
-                        <span className="sr-only">Delete</span>
-                      </Button>
+                      <DeleteProductButton productId={product.id} productName={product.name} />
                     </TableCell>
                   </TableRow>
                 ))}

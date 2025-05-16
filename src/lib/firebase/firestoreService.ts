@@ -1,12 +1,14 @@
 
 import { db } from '@/lib/firebase';
-import type { Product, Collection, Order } from '@/types';
+import type { Product, Collection, Order, UserProfile, OrderStatus } from '@/types';
 import { 
   collection, 
   doc, 
   getDoc, 
   getDocs, 
   addDoc, 
+  updateDoc,
+  deleteDoc,
   query, 
   where, 
   limit,
@@ -14,12 +16,14 @@ import {
   writeBatch,
   serverTimestamp,
   documentId,
-  getCountFromServer // For counting documents
+  getCountFromServer,
+  setDoc // For setting a document with a specific ID (e.g., user profiles)
 } from 'firebase/firestore';
 
 const PRODUCTS_COLLECTION = 'products';
 const COLLECTIONS_COLLECTION = 'collections';
 const ORDERS_COLLECTION = 'orders';
+const USERS_COLLECTION = 'users';
 
 
 const fromFirestore = <T extends { id: string }>(docSnap: ReturnType<typeof getDoc> | any): T | null => {
@@ -28,17 +32,22 @@ const fromFirestore = <T extends { id: string }>(docSnap: ReturnType<typeof getD
   }
   const data = docSnap.data();
   
-  // Convert Firestore Timestamps to JS Date objects if they exist
-  // This is a common practice, but depends on how you want to handle dates in your app
-  // For now, assuming dates are stored as strings or will be handled appropriately by components
-  // Example of handling timestamps:
-  // for (const key in data) {
-  //   if (data[key] instanceof Timestamp) {
-  //     data[key] = data[key].toDate();
-  //   }
-  // }
+  // Convert known Firestore Timestamps to JS Date objects or ISO strings
+  const convertTimestamps = (obj: any) => {
+    for (const key in obj) {
+      if (obj[key] instanceof Timestamp) {
+        obj[key] = obj[key].toDate().toISOString(); // Or .toDate() if you prefer Date objects
+      } else if (typeof obj[key] === 'object' && obj[key] !== null) {
+        convertTimestamps(obj[key]); // Recurse for nested objects
+      }
+    }
+  };
+
+  // Apply timestamp conversion to a copy to avoid modifying the original snapshot data
+  const dataWithConvertedTimestamps = { ...data };
+  convertTimestamps(dataWithConvertedTimestamps);
   
-  return { id: docSnap.id, ...data } as T;
+  return { id: docSnap.id, ...dataWithConvertedTimestamps } as T;
 };
 
 
@@ -104,7 +113,7 @@ export async function getProductsByIds(ids: string[]): Promise<Product[]> {
   const collectionPath = PRODUCTS_COLLECTION;
   console.log(`[FirestoreService] Attempting to read from collection: '${collectionPath}' for getProductsByIds.`);
   try {
-    const CHUNK_SIZE = 30;
+    const CHUNK_SIZE = 30; // Firestore 'in' query limit is 30
     const productPromises: Promise<Product[]>[] = [];
 
     for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
@@ -189,29 +198,49 @@ export async function addProduct(productData: Omit<Product, 'id'>): Promise<Prod
   try {
     const dataWithTimestamp = {
       ...productData,
-      // createdAt: serverTimestamp(), 
-      // updatedAt: serverTimestamp(),
+      createdAt: serverTimestamp(), 
+      updatedAt: serverTimestamp(),
     };
     const docRef = await addDoc(collection(db, collectionPath), dataWithTimestamp);
-    // Fetch the newly created document to ensure consistency (optional, but good practice)
-    // const newDocSnap = await getDoc(docRef);
-    // return fromFirestore<Product>(newDocSnap);
-    // For simplicity here, we construct the object directly
-    return { id: docRef.id, ...productData } as Product;
+    return { id: docRef.id, ...productData } as Product; // Timestamps will be set by server
   } catch (error) {
     console.error(`[FirestoreService] Error adding product to Firestore collection '${collectionPath}':`, error);
     return null;
   }
 }
 
-// Fetch Orders
+export async function updateProduct(productId: string, productData: Partial<Omit<Product, 'id'>>): Promise<boolean> {
+  const docPath = `${PRODUCTS_COLLECTION}/${productId}`;
+  console.log(`[FirestoreService] Attempting to update document: '${docPath}'.`);
+  try {
+    const docRef = doc(db, PRODUCTS_COLLECTION, productId);
+    await updateDoc(docRef, { ...productData, updatedAt: serverTimestamp() });
+    return true;
+  } catch (error) {
+    console.error(`[FirestoreService] Error updating product with ID ${productId} in '${docPath}':`, error);
+    return false;
+  }
+}
+
+export async function deleteProduct(productId: string): Promise<boolean> {
+  const docPath = `${PRODUCTS_COLLECTION}/${productId}`;
+  console.log(`[FirestoreService] Attempting to delete document: '${docPath}'.`);
+  try {
+    const docRef = doc(db, PRODUCTS_COLLECTION, productId);
+    await deleteDoc(docRef);
+    return true;
+  } catch (error) {
+    console.error(`[FirestoreService] Error deleting product with ID ${productId} from '${docPath}':`, error);
+    return false;
+  }
+}
+
 export async function getOrders(count?: number): Promise<Order[]> {
   const collectionPath = ORDERS_COLLECTION;
   console.log(`[FirestoreService] Attempting to read from collection: '${collectionPath}' for getOrders.`);
   try {
     const ordersRef = collection(db, collectionPath);
-    // Add orderBy('orderDate', 'desc') if dates were Timestamps and you want recent orders
-    const q = count ? query(ordersRef, limit(count)) : ordersRef;
+    const q = count ? query(ordersRef, limit(count)) : query(ordersRef); // Removed default sort for now
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(docSnap => fromFirestore<Order>(docSnap)).filter(o => o !== null) as Order[];
   } catch (error) {
@@ -220,8 +249,59 @@ export async function getOrders(count?: number): Promise<Order[]> {
   }
 }
 
-// Placeholder for updating a product
-// export async function updateProduct(productId: string, productData: Partial<Product>): Promise<boolean> { ... }
+export async function getOrderById(orderId: string): Promise<Order | null> {
+  const docPath = `${ORDERS_COLLECTION}/${orderId}`;
+  console.log(`[FirestoreService] Attempting to read document: '${docPath}'.`);
+  try {
+    const docRef = doc(db, ORDERS_COLLECTION, orderId);
+    const docSnap = await getDoc(docRef);
+    return fromFirestore<Order>(docSnap);
+  } catch (error) {
+    console.error(`[FirestoreService] Error fetching order with ID ${orderId} from '${docPath}':`, error);
+    return null;
+  }
+}
 
-// Placeholder for deleting a product
-// export async function deleteProduct(productId: string): Promise<boolean> { ... }
+export async function updateOrderStatus(orderId: string, status: OrderStatus): Promise<boolean> {
+  const docPath = `${ORDERS_COLLECTION}/${orderId}`;
+  console.log(`[FirestoreService] Attempting to update status for order: '${docPath}'.`);
+  try {
+    const docRef = doc(db, ORDERS_COLLECTION, orderId);
+    await updateDoc(docRef, { status: status, updatedAt: serverTimestamp() });
+    return true;
+  } catch (error) {
+    console.error(`[FirestoreService] Error updating status for order ${orderId} in '${docPath}':`, error);
+    return false;
+  }
+}
+
+export async function addUserProfile(uid: string, email: string, displayName?: string | null): Promise<boolean> {
+  const docPath = `${USERS_COLLECTION}/${uid}`;
+  console.log(`[FirestoreService] Attempting to create user profile: '${docPath}'.`);
+  try {
+    const userProfileData: Omit<UserProfile, 'id'> = {
+      email: email,
+      displayName: displayName || null,
+      createdAt: serverTimestamp(),
+    };
+    await setDoc(doc(db, USERS_COLLECTION, uid), userProfileData);
+    return true;
+  } catch (error) {
+    console.error(`[FirestoreService] Error creating user profile for UID ${uid} in '${docPath}':`, error);
+    return false;
+  }
+}
+
+export async function getUsers(count?: number): Promise<UserProfile[]> {
+  const collectionPath = USERS_COLLECTION;
+  console.log(`[FirestoreService] Attempting to read from collection: '${collectionPath}' for getUsers.`);
+  try {
+    const usersRef = collection(db, collectionPath);
+    const q = count ? query(usersRef, limit(count)) : usersRef;
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(docSnap => fromFirestore<UserProfile>(docSnap)).filter(u => u !== null) as UserProfile[];
+  } catch (error) {
+    console.error(`[FirestoreService] Error fetching users from '${collectionPath}':`, error);
+    return [];
+  }
+}
