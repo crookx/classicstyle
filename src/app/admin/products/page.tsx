@@ -3,17 +3,14 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { mockProducts } from '@/data/mock-data'; // We'll read from this for display
+import { mockProducts } from '@/data/mock-data'; 
 import type { Product } from '@/types';
 import Image from 'next/image';
-import { PlusCircle, Edit, Trash2 } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Eye } from 'lucide-react'; // Added Eye icon
 import { Badge } from '@/components/ui/badge';
 
-// For this page, we'll just display mockProducts. 
-// Real applications would fetch this data from a database.
-
 export default function AdminProductsPage() {
-  const products: Product[] = mockProducts; // In a real app, this would be a fetch call
+  const products: Product[] = mockProducts; 
 
   return (
     <div className="space-y-8">
@@ -32,50 +29,54 @@ export default function AdminProductsPage() {
       <Card className="shadow-xl rounded-xl">
         <CardHeader>
           <CardTitle>Product List</CardTitle>
-          <CardDescription>A total of {products.length} products found.</CardDescription>
+          <CardDescription>A total of {products.length} products found. Product data is in-memory for this demo.</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[80px]">Image</TableHead>
+                <TableHead className="w-[60px] hidden sm:table-cell">Image</TableHead>
                 <TableHead>Name</TableHead>
-                <TableHead>SKU</TableHead>
-                <TableHead>Category</TableHead>
+                <TableHead className="hidden md:table-cell">SKU</TableHead>
+                <TableHead className="hidden lg:table-cell">Category</TableHead>
                 <TableHead className="text-right">Price</TableHead>
-                <TableHead className="text-center">Stock</TableHead> {/* Placeholder */}
-                <TableHead className="text-center">Status</TableHead> {/* Placeholder */}
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="text-center hidden md:table-cell">Status</TableHead>
+                <TableHead className="text-right w-[150px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {products.map((product) => (
                 <TableRow key={product.id}>
-                  <TableCell>
+                  <TableCell className="hidden sm:table-cell">
                     <Image 
                       src={product.imageUrl || 'https://placehold.co/100x100.png'} 
                       alt={product.name} 
-                      width={60} 
-                      height={60} 
+                      width={48} 
+                      height={48} 
                       className="rounded-md object-cover aspect-square" 
+                      data-ai-hint={product.dataAiHint || product.category}
                     />
                   </TableCell>
                   <TableCell className="font-medium">{product.name}</TableCell>
-                  <TableCell>{product.sku || 'N/A'}</TableCell>
-                  <TableCell>{product.category || 'N/A'}</TableCell>
+                  <TableCell className="hidden md:table-cell">{product.sku || 'N/A'}</TableCell>
+                  <TableCell className="hidden lg:table-cell">{product.category || 'N/A'}</TableCell>
                   <TableCell className="text-right">${product.price.toFixed(2)}</TableCell>
-                  <TableCell className="text-center">N/A</TableCell> {/* Placeholder */}
-                  <TableCell className="text-center">
-                    <Badge variant="default">Published</Badge> {/* Placeholder */}
+                  <TableCell className="text-center hidden md:table-cell">
+                    <Badge variant={product.isFeatured ? "default" : "outline"}>
+                      {product.isFeatured ? "Featured" : "Published"}
+                    </Badge>
                   </TableCell>
-                  <TableCell className="text-right space-x-2">
-                    <Link href={`/admin/products/${product.id}/edit`} asChild>
-                      <Button variant="outline" size="icon" disabled> {/* Edit disabled for now. Button is NOT asChild. Link IS asChild. */}
-                        <Edit className="h-4 w-4" />
-                        <span className="sr-only">Edit</span>
+                  <TableCell className="text-right space-x-1">
+                    <Link href={`/products/${product.id}`} passHref legacyBehavior>
+                      <Button variant="ghost" size="icon" asChild title="View Product">
+                        <a><Eye className="h-4 w-4" /></a>
                       </Button>
                     </Link>
-                    <Button variant="destructive" size="icon" disabled> {/* Delete disabled for now */}
+                    <Button variant="ghost" size="icon" disabled title="Edit Product (coming soon)">
+                      <Edit className="h-4 w-4" />
+                      <span className="sr-only">Edit</span>
+                    </Button>
+                    <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive hover:bg-destructive/10" disabled title="Delete Product (coming soon)">
                       <Trash2 className="h-4 w-4" />
                       <span className="sr-only">Delete</span>
                     </Button>
