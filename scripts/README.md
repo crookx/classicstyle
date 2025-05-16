@@ -35,11 +35,7 @@ This script is used to populate your Firebase Firestore database with initial pr
     npm install --save-dev ts-node typescript @types/node
     npm install firebase-admin
     ```
-    Or if using Yarn:
-    ```bash
-    yarn add --dev ts-node typescript @types/node
-    yarn add firebase-admin
-    ```
+    (If you already have `tsx` via `genkit-cli` or similar, `ts-node` might not be strictly needed for this script if using `tsx`, but it's good to have for general TypeScript scripting).
 5.  **Package.json type**: Ensure your `package.json` in the project root contains `"type": "module"` to correctly run ESM scripts.
 
 ### How to Run
@@ -49,7 +45,7 @@ This script is used to populate your Firebase Firestore database with initial pr
 3.  Execute the script using the following command:
 
     ```bash
-    node --import=ts-node/esm ./scripts/populateFirestore.ts
+    npx tsx ./scripts/populateFirestore.ts
     ```
 
 4.  The script will log its progress to the console. Upon successful completion, your `products` and `collections` collections in Firestore should be populated.
@@ -61,4 +57,3 @@ This script is used to populate your Firebase Firestore database with initial pr
 *   The `databaseURL` in `populateFirestore.ts` should match your Firebase project's database URL (usually `https://<YOUR_PROJECT_ID>.firebaseio.com` or `https://<YOUR_PROJECT_ID>.firestore.io`). The script currently has a placeholder for `clothstore-25546`.
 *   The `serviceAccount` import in `populateFirestore.ts` is cast to `admin.ServiceAccount` to satisfy TypeScript, as direct JSON imports sometimes don't carry precise type information for complex objects.
 *   Batches are re-initialized after each commit to prevent errors with using an already committed batch.
-
