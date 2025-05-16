@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { SiteLogo } from './SiteLogo';
 import { Button } from '@/components/ui/button';
-import { Heart, ShoppingCart, User, Search, Menu, LogIn, LogOut } from 'lucide-react';
+import { Heart, ShoppingCart, User, Search, Menu, LogIn, LogOut, ShieldCheck } from 'lucide-react';
 import { useCart } from '@/contexts/CartContext';
 import { useWishlist } from '@/contexts/WishlistContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -62,8 +62,8 @@ export default function Header() {
             <Search className="h-5 w-5" />
             <span className="sr-only">Search</span>
           </Button>
-          <Link href="/wishlist" passHref legacyBehavior>
-            <Button variant="ghost" size="icon" className="hidden md:inline-flex relative hover:bg-accent/50">
+          <Button variant="ghost" size="icon" asChild className="hidden md:inline-flex relative hover:bg-accent/50">
+            <Link href="/wishlist">
               <Heart className="h-5 w-5" />
               {wishlistItemCount > 0 && (
                 <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full h-4 w-4 flex items-center justify-center">
@@ -71,10 +71,10 @@ export default function Header() {
                 </span>
               )}
               <span className="sr-only">Wishlist</span>
-            </Button>
-          </Link>
-          <Link href="/cart" passHref legacyBehavior>
-            <Button variant="ghost" size="icon" className="hidden md:inline-flex relative hover:bg-accent/50">
+            </Link>
+          </Button>
+          <Button variant="ghost" size="icon" asChild className="hidden md:inline-flex relative hover:bg-accent/50">
+            <Link href="/cart">
               <ShoppingCart className="h-5 w-5" />
               {cartItemCount > 0 && (
                 <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full h-4 w-4 flex items-center justify-center">
@@ -82,24 +82,33 @@ export default function Header() {
                 </span>
               )}
               <span className="sr-only">Cart</span>
+            </Link>
+          </Button>
+          
+          {!loading && currentUser && (
+             <Button variant="ghost" size="icon" asChild className="hidden md:inline-flex hover:bg-accent/50">
+                <Link href="/admin">
+                    <ShieldCheck className="h-5 w-5" />
+                    <span className="sr-only">Admin Panel</span>
+                </Link>
             </Button>
-          </Link>
+          )}
           
           {!loading && (
             currentUser ? (
-              <Link href="/account" passHref legacyBehavior>
-                <Button variant="ghost" size="icon" className="hidden md:inline-flex hover:bg-accent/50">
+              <Button variant="ghost" size="icon" asChild className="hidden md:inline-flex hover:bg-accent/50">
+                <Link href="/account">
                   <User className="h-5 w-5" />
                   <span className="sr-only">Account</span>
-                </Button>
-              </Link>
+                </Link>
+              </Button>
             ) : (
-              <Link href="/login" passHref legacyBehavior>
-                <Button variant="ghost" size="icon" className="hidden md:inline-flex hover:bg-accent/50">
+              <Button variant="ghost" size="icon" asChild className="hidden md:inline-flex hover:bg-accent/50">
+                <Link href="/login">
                   <LogIn className="h-5 w-5" />
                   <span className="sr-only">Login</span>
-                </Button>
-              </Link>
+                </Link>
+              </Button>
             )
           )}
           {loading && (
@@ -151,6 +160,9 @@ export default function Header() {
                       <>
                         <Link href="/account" className="flex items-center text-lg text-foreground hover:text-primary transition-colors font-medium py-2" onClick={() => setMobileMenuOpen(false)}>
                           <User className="mr-3 h-5 w-5" /> My Account
+                        </Link>
+                        <Link href="/admin" className="flex items-center text-lg text-foreground hover:text-primary transition-colors font-medium py-2" onClick={() => setMobileMenuOpen(false)}>
+                            <ShieldCheck className="mr-3 h-5 w-5" /> Admin Panel
                         </Link>
                         <Button variant="ghost" className="w-full justify-start text-lg text-destructive hover:text-destructive px-0 py-2 font-medium" onClick={handleLogout}>
                           <LogOut className="mr-3 h-5 w-5" /> Logout

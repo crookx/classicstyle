@@ -4,7 +4,7 @@ import type { Product, Collection } from '@/types';
 // KSh prices are used as magnitude for USD prices for consistency with app's '$' currency.
 // For simplicity, using lower end of KSh range.
 
-export const mockProducts: Product[] = [
+export let mockProducts: Product[] = [ // Changed to let for in-memory modification by server actions
   // Men's Category - Trousers
   {
     id: 'mens-jeans-slim-001',
@@ -20,8 +20,9 @@ export const mockProducts: Product[] = [
     details: ['98% Cotton, 2% Elastane', 'Machine washable', 'Five-pocket styling', 'Slim through thigh, tapered leg'],
     colors: [{ name: 'Dark Wash', hex: '#2F4F4F' }, { name: 'Black', hex: '#000000' }],
     sizes: ['28W', '30W', '32W', '34W', '36W'],
-    tags: ['men', 'jeans', 'trousers', 'denim', 'slim fit', 'featured'],
+    tags: ['men', 'jeans', 'trousers', 'denim', 'slim fit'],
     sku: 'CS-MJN-001',
+    isFeatured: true,
   },
   {
     id: 'mens-chinos-classic-002',
@@ -39,6 +40,7 @@ export const mockProducts: Product[] = [
     sizes: ['30W', '32W', '34W', '36W', '38W'],
     tags: ['men', 'chinos', 'trousers', 'smart casual'],
     sku: 'CS-MCH-002',
+    isFeatured: false,
   },
   {
     id: 'mens-cargo-pants-utility-003',
@@ -56,6 +58,7 @@ export const mockProducts: Product[] = [
     sizes: ['S', 'M', 'L', 'XL'],
     tags: ['men', 'cargo pants', 'trousers', 'utility', 'outdoor'],
     sku: 'CS-MCP-003',
+    isFeatured: false,
   },
   {
     id: 'mens-shorts-denim-004',
@@ -106,8 +109,9 @@ export const mockProducts: Product[] = [
     details: ['100% Cotton Oxford', 'Button-down collar', 'Adjustable cuffs', 'Slim fit'],
     colors: [{ name: 'White', hex: '#FFFFFF' }, { name: 'Light Blue', hex: '#ADD8E6' }],
     sizes: ['15"', '15.5"', '16"', '16.5"', '17"'],
-    tags: ['men', 'shirts', 'dress shirt', 'formal', 'oxford', 'featured'],
+    tags: ['men', 'shirts', 'dress shirt', 'formal', 'oxford'],
     sku: 'CS-MDS-006',
+    isFeatured: true,
   },
   {
     id: 'mens-tshirt-graphic-007',
@@ -161,8 +165,6 @@ export const mockProducts: Product[] = [
     tags: ['men', 'shoes', 'sneakers', 'casual', 'urban'],
     sku: 'CS-MSN-009',
   },
-  // ... More Men's products
-
   // Women's Category - Dresses
   {
     id: 'womens-dress-floral-010',
@@ -178,8 +180,9 @@ export const mockProducts: Product[] = [
     details: ['100% Rayon Voile', 'Midi length, A-line silhouette', 'Elastic waist with tie detail'],
     colors: [{ name: 'Blue Meadow Floral', hex: '#ADD8E6' }, { name: 'Sunset Rose Floral', hex: '#FFC0CB' }],
     sizes: ['S', 'M', 'L', 'XL'],
-    tags: ['women', 'dresses', 'casual dress', 'floral', 'midi dress', 'featured'],
+    tags: ['women', 'dresses', 'casual dress', 'floral', 'midi dress'],
     sku: 'CS-WDR-010',
+    isFeatured: true,
   },
   {
     id: 'womens-dress-evening-011',
@@ -216,8 +219,6 @@ export const mockProducts: Product[] = [
     tags: ['women', 'tops', 'blouse', 'silk', 'elegant', 'workwear'],
     sku: 'CS-WBL-012',
   },
-  // ... More Women's products
-
   // Kids' Category - Boys'
   {
     id: 'kids-boystshirt-dino-013',
@@ -233,8 +234,9 @@ export const mockProducts: Product[] = [
     details: ['100% Organic Cotton', 'Crew neck', 'Short sleeves', 'Tagless label for comfort'],
     colors: [{ name: 'Jungle Green', hex: '#29AB87' }, { name: 'Sky Blue', hex: '#87CEEB' }],
     sizes: ['2T', '3T', '4T', '5T', '6Y'],
-    tags: ['kids', 'boys', 't-shirt', 'dinosaur', 'graphic tee', 'featured'],
+    tags: ['kids', 'boys', 't-shirt', 'dinosaur', 'graphic tee'],
     sku: 'CS-KBT-013',
+    isFeatured: true,
   },
   // Kids' Category - Girls'
   {
@@ -254,8 +256,6 @@ export const mockProducts: Product[] = [
     tags: ['kids', 'girls', 'dress', 'party dress', 'sparkle', 'tulle'],
     sku: 'CS-KGD-014',
   },
-  // ... More Kids' products
-
   // Accessories Category - Bags
   {
     id: 'accs-handbag-leather-015',
@@ -271,8 +271,9 @@ export const mockProducts: Product[] = [
     details: ['Genuine Cowhide Leather', 'Durable cotton lining', 'Gold-tone hardware', 'Interior zip pocket'],
     colors: [{ name: 'Black', hex: '#000000' }, { name: 'Cognac Tan', hex: '#9A643C' }, { name: 'Deep Burgundy', hex: '#800020'}],
     sizes: ['One Size'],
-    tags: ['accessories', 'handbag', 'tote bag', 'leather', 'classic', 'workbag', 'featured'],
+    tags: ['accessories', 'handbag', 'tote bag', 'leather', 'classic', 'workbag'],
     sku: 'CS-AHB-015',
+    isFeatured: true,
   },
   // Accessories - Jewelry
   {
@@ -292,8 +293,6 @@ export const mockProducts: Product[] = [
     tags: ['accessories', 'jewelry', 'necklace', 'silver', 'pendant', 'minimalist'],
     sku: 'CS-AJN-016',
   },
-  // ... More Accessories
-
   // Sale Category
   {
     id: 'sale-mens-shirt-linen-017',
