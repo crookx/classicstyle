@@ -12,7 +12,8 @@ import { Badge } from '@/components/ui/badge';
 import type { Order, OrderStatus } from '@/types';
 import UpdateOrderStatusForm from './UpdateOrderStatusForm';
 import { useAuth } from '@/contexts/AuthContext';
-import { Loader2, AlertTriangle } from 'lucide-react';
+import { Loader2, AlertTriangle, ArrowLeft } from 'lucide-react';
+import Link from 'next/link';
 
 const statusColors: Record<OrderStatus, string> = {
   Pending: "bg-yellow-500/20 text-yellow-700 border-yellow-500/50",
@@ -20,6 +21,7 @@ const statusColors: Record<OrderStatus, string> = {
   Shipped: "bg-sky-500/20 text-sky-700 border-sky-500/50",
   Delivered: "bg-green-500/20 text-green-700 border-green-500/50",
   Cancelled: "bg-red-500/20 text-red-700 border-red-500/50",
+  PaymentFailed: "bg-destructive/20 text-destructive border-destructive/50",
 };
 
 export default function OrderDetailPage() {
@@ -54,12 +56,8 @@ export default function OrderDetailPage() {
 
   useEffect(() => {
     if (!authLoading) {
-      if (!currentUser) {
+      if (!currentUser || !isAdmin) {
         router.push(`/login?redirect=/admin/orders/${orderId}`);
-        return;
-      }
-      if (isAdmin === false) {
-        router.push('/admin'); // Or some other appropriate non-admin page
         return;
       }
       if (currentUser && isAdmin) {
@@ -69,9 +67,7 @@ export default function OrderDetailPage() {
   }, [currentUser, isAdmin, authLoading, orderId, router, fetchOrder]);
 
   const handleStatusUpdateSuccess = (newStatus: OrderStatus) => {
-    // Re-fetch order or update local state to reflect the change immediately
     setOrder(prevOrder => prevOrder ? { ...prevOrder, status: newStatus, updatedAt: new Date().toISOString() } : null);
-    // fetchOrder(); // Or re-fetch for full consistency
   };
 
 
@@ -112,8 +108,14 @@ export default function OrderDetailPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
-      <div className="flex justify-between items-center">
-        <div>
+       <div className="flex items-center gap-4">
+        <Link href="/admin/orders" passHref>
+          <Button variant="outline" size="icon">
+            <ArrowLeft className="h-4 w-4" />
+            <span className="sr-only">Back to Orders</span>
+          </Button>
+        </Link>
+        <div className="flex-grow">
           <h1 className="text-3xl font-serif font-bold">Order Details</h1>
           <p className="text-muted-foreground">Order ID: {order.id}</p>
         </div>
@@ -186,6 +188,7 @@ export default function OrderDetailPage() {
             <CardContent className="text-sm space-y-1">
               <p><strong>Order Date:</strong> {order.orderDate ? format(new Date(order.orderDate), 'PPP p') : 'N/A'}</p>
               <p><strong>Last Updated:</strong> {order.updatedAt ? format(new Date(order.updatedAt), 'PPP p') : 'N/A'}</p>
+              {order.paymentIntentId && <p className="text-xs text-muted-foreground">Payment ID: {order.paymentIntentId}</p>}
             </CardContent>
           </Card>
         </div>

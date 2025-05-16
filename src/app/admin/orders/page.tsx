@@ -8,42 +8,71 @@ import { Badge } from "@/components/ui/badge";
 import { ShoppingCart, Eye, Loader2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getOrders as fetchOrdersFromDB } from '@/lib/firebase/firestoreService';
-import type { Order } from '@/types';
+import type { Order, OrderStatus } from '@/types';
 import { format } from 'date-fns';
 import Link from "next/link";
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 
+const getStatusBadgeVariant = (status: OrderStatus) => {
+  switch (status) {
+    case "Shipped":
+    case "Delivered":
+      return "default";
+    case "Processing":
+      return "secondary";
+    case "Cancelled":
+    case "PaymentFailed":
+      return "destructive";
+    case "Pending":
+    default:
+      return "outline";
+  }
+};
+
+const getStatusBadgeClass = (status: OrderStatus) => {
+  switch (status) {
+    case "Delivered":
+      return "bg-green-600 text-white dark:bg-green-700 dark:text-primary-foreground";
+    case "PaymentFailed":
+      return "bg-red-700 text-white dark:bg-red-800 dark:text-primary-foreground";
+    default:
+      return "";
+  }
+};
+
+
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { currentUser, loading: authLoading } = useAuth();
+  const { currentUser, isAdmin, loading: authLoading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!authLoading && !currentUser) {
-      router.push('/login?redirect=/admin/orders');
-      return;
+    if (!authLoading) {
+      if (!currentUser || !isAdmin) {
+        router.push('/login?redirect=/admin/orders');
+        return;
+      }
+      if (currentUser && isAdmin) {
+        const loadOrders = async () => {
+          setIsLoading(true);
+          setError(null);
+          try {
+            const fetchedOrders = await fetchOrdersFromDB();
+            setOrders(fetchedOrders);
+          } catch (e: any) {
+            console.error("Error fetching orders:", e);
+            setError("Failed to load orders. " + (e.message.includes("permission") ? "Check Firestore permissions." : e.message));
+          } finally {
+            setIsLoading(false);
+          }
+        };
+        loadOrders();
+      }
     }
-
-    if (currentUser) {
-      const loadOrders = async () => {
-        setIsLoading(true);
-        setError(null);
-        try {
-          const fetchedOrders = await fetchOrdersFromDB();
-          setOrders(fetchedOrders);
-        } catch (e: any) {
-          console.error("Error fetching orders:", e);
-          setError("Failed to load orders. " + (e.message.includes("permission") ? "Check Firestore permissions." : e.message));
-        } finally {
-          setIsLoading(false);
-        }
-      };
-      loadOrders();
-    }
-  }, [currentUser, authLoading, router]);
+  }, [currentUser, isAdmin, authLoading, router]);
 
   if (authLoading || isLoading) {
     return (
@@ -103,14 +132,8 @@ export default function AdminOrdersPage() {
                     <TableCell className="hidden sm:table-cell">KSh {order.totalAmount.toFixed(2)}</TableCell>
                     <TableCell className="text-center">
                       <Badge
-                        variant={
-                          order.status === "Shipped" ? "default" :
-                          order.status === "Processing" ? "secondary" :
-                          order.status === "Delivered" ? "default" :
-                          order.status === "Cancelled" ? "destructive" :
-                          "outline"
-                        }
-                        className={order.status === "Delivered" ? "bg-green-600 text-white dark:bg-green-700 dark:text-primary-foreground" : ""}
+                        variant={getStatusBadgeVariant(order.status)}
+                        className={getStatusBadgeClass(order.status)}
                       >
                         {order.status}
                       </Badge>

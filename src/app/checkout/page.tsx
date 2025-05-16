@@ -19,12 +19,11 @@ import { Loader2, AlertTriangle } from 'lucide-react';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { decrementStockForOrderAction } from '@/lib/actions/orderActions';
-import { createPaymentIntentAction } from '@/lib/actions/paymentActions'; // Import the new action
+import { createPaymentIntentAction } from '@/lib/actions/paymentActions';
 
 import { loadStripe, StripeElementsOptions } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 
-// Ensure your publishable key is set in .env (or .env.local)
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
 const shippingSchema = z.object({
@@ -39,7 +38,6 @@ const shippingSchema = z.object({
   phone: z.string().optional(),
 });
 
-// Remove mock payment schema, Stripe Elements handles this.
 const checkoutSchema = shippingSchema;
 
 interface OrderDetailsForEmail {
@@ -63,7 +61,18 @@ interface OrderDetailsForEmail {
 async function initiateOrderConfirmationEmail(orderDetails: OrderDetailsForEmail) {
   console.log('--- SIMULATING INITIATION OF ORDER CONFIRMATION EMAIL ---');
   console.log('Order Details Prepared:', JSON.stringify(orderDetails, null, 2));
-  console.log('Next Step: Call a backend API/Cloud Function to process and send the actual email.');
+  // In a real app, you might call a Firebase Cloud Function here:
+  // try {
+  //   const response = await fetch('/api/send-order-confirmation', { // Or your Cloud Function HTTP endpoint
+  //     method: 'POST',
+  //     headers: { 'Content-Type': 'application/json' },
+  //     body: JSON.stringify(orderDetails),
+  //   });
+  //   if (!response.ok) console.error('Failed to trigger order confirmation email:', await response.text());
+  //   else console.log('Order confirmation email trigger successful.');
+  // } catch (error) {
+  //   console.error('Error triggering order confirmation email:', error);
+  // }
   console.log('--- END OF ORDER CONFIRMATION SIMULATION ---');
 }
 
@@ -102,7 +111,6 @@ function CheckoutForm() {
     }
   }, [currentUser, form]);
 
-  // Create Payment Intent when total price changes and is valid
   useEffect(() => {
     if (totalPrice > 0 && currentUser) {
       createPaymentIntentAction({ 
@@ -128,7 +136,6 @@ function CheckoutForm() {
     }
   }, [totalPrice, currentUser, form]);
 
-
   async function onSubmit(values: z.infer<typeof checkoutSchema>) {
     if (!stripe || !elements || !clientSecret) {
       toast({ title: "Error", description: "Payment system is not ready. Please try again.", variant: "destructive" });
@@ -136,6 +143,7 @@ function CheckoutForm() {
     }
     if (!currentUser) {
       toast({ title: "Error", description: "You must be logged in to place an order.", variant: "destructive" });
+      router.push('/login?redirect=/checkout');
       return;
     }
 
@@ -154,7 +162,7 @@ function CheckoutForm() {
       elements,
       clientSecret,
       confirmParams: {
-        return_url: `${window.location.origin}/checkout/thank-you`, // Or some other success page
+        return_url: `${window.location.origin}/checkout/thank-you`, 
         receipt_email: values.email,
         shipping: {
             name: `${values.firstName} ${values.lastName}`,
@@ -163,17 +171,35 @@ function CheckoutForm() {
                 line2: values.apartment || undefined,
                 city: values.city,
                 postal_code: values.postalCode,
-                country: values.country, // Stripe expects 2-letter country code for shipping
+                country: values.country.length === 2 ? values.country : 'KE', // Stripe expects 2-letter country code
             },
             phone: values.phone || undefined,
         }
       },
-      redirect: 'if_required', // Handle redirect manually or let Stripe handle it
+      redirect: 'if_required', 
     });
 
     if (error) {
       setPaymentError(error.message || "An unexpected payment error occurred.");
       toast({ title: "Payment Failed", description: error.message || "An unexpected payment error occurred.", variant: "destructive" });
+      // Optionally, create an order with 'PaymentFailed' status
+      // This helps track failed attempts, especially if using webhooks
+      try {
+        const orderItemsForDb = cart.map(item => ({
+          productId: item.id, name: item.name, quantity: item.quantityInCart, price: item.price, imageUrl: item.imageUrl,
+        }));
+        const failedOrderData = {
+          customerName: `${values.firstName} ${values.lastName}`, customerEmail: values.email, userId: currentUser.uid,
+          orderDate: serverTimestamp(), totalAmount: totalPrice, status: 'PaymentFailed' as const, items: orderItemsForDb,
+          shippingAddress: { address: values.address, city: values.city, postalCode: values.postalCode, country: values.country },
+          paymentIntentId: clientSecret.split('_secret_')[0], // Extract PI ID from client secret
+          createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+        };
+        await addDoc(collection(db, "orders"), failedOrderData);
+        console.log("Logged failed payment attempt as order:", failedOrderData.paymentIntentId);
+      } catch (dbError) {
+        console.error("Error logging failed payment attempt to DB:", dbError);
+      }
       setIsProcessingPayment(false);
       return;
     }
@@ -189,7 +215,8 @@ function CheckoutForm() {
         customerName: `${values.firstName} ${values.lastName}`, customerEmail: values.email, userId: currentUser.uid,
         orderDate: serverTimestamp(), totalAmount: totalPrice, status: 'Pending' as const, items: orderItemsForDb,
         shippingAddress: { address: values.address, city: values.city, postalCode: values.postalCode, country: values.country },
-        paymentIntentId: paymentIntent.id, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+        paymentIntentId: paymentIntent.id, 
+        createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
       };
 
       try {
@@ -210,14 +237,17 @@ function CheckoutForm() {
 
         toast({ title: "Order Placed!", description: `Thank you, ${values.firstName}! Your order #${orderNumber} is being processed.` });
         await clearCart();
-        router.push('/'); // Or a dedicated "Thank You" page
+        router.push('/'); // Or a dedicated "Thank You" page like `/checkout/thank-you?orderId=${orderNumber}`
       } catch (orderError) {
         console.error("Error placing order or updating stock after payment:", orderError);
         toast({ title: "Order Processing Failed", description: "Payment was successful, but there was an error creating your order. Please contact support.", variant: "destructive", duration: 10000 });
-        // TODO: Potentially refund payment if order creation fails catastrophically
       }
     } else if (paymentIntent) {
         toast({ title: "Payment Incomplete", description: `Payment status: ${paymentIntent.status}. Please try again or contact support.`, variant: "destructive" });
+    } else {
+      // Handle cases where paymentIntent might be null if redirect happened but confirmation failed.
+      // This scenario might not be hit if `redirect: 'if_required'` successfully redirects.
+      toast({ title: "Payment Status Unknown", description: "Could not confirm payment status. Please check your orders or contact support.", variant: "destructive" });
     }
 
     setIsProcessingPayment(false);
@@ -227,6 +257,7 @@ function CheckoutForm() {
     return ( <div className="py-12 text-center flex flex-col items-center justify-center min-h-[calc(100vh-200px)]"> <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" /> <h1 className="text-2xl font-bold font-serif">Loading Checkout</h1> <p className="text-muted-foreground">Please wait...</p> </div> );
   }
   if (!currentUser && !authLoading) {
+    router.push('/login?redirect=/checkout');
     return ( <div className="py-12 text-center"><h1 className="text-xl font-bold">Redirecting to login...</h1></div> );
   }
   if (cart.length === 0 && currentUser) {
@@ -258,7 +289,7 @@ function CheckoutForm() {
               <FormField control={form.control} name="apartment" render={({ field }) => ( <FormItem><FormLabel>Apartment, suite, etc. (optional)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
               <div className="grid sm:grid-cols-3 gap-4">
                 <FormField control={form.control} name="city" render={({ field }) => ( <FormItem><FormLabel>City</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-                <FormField control={form.control} name="country" render={({ field }) => ( <FormItem><FormLabel>Country</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                <FormField control={form.control} name="country" render={({ field }) => ( <FormItem><FormLabel>Country</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} /> {/* TODO: Make this a select with country codes */}
                 <FormField control={form.control} name="postalCode" render={({ field }) => ( <FormItem><FormLabel>Postal Code</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
               </div>
               <FormField control={form.control} name="phone" render={({ field }) => ( <FormItem><FormLabel>Phone (optional)</FormLabel><FormControl><Input type="tel" {...field} /></FormControl><FormDescription>For shipping updates.</FormDescription><FormMessage /></FormItem> )} />
@@ -268,8 +299,10 @@ function CheckoutForm() {
           <Card className="shadow-lg rounded-xl">
             <CardHeader><CardTitle className="text-2xl font-serif">Payment Details</CardTitle></CardHeader>
             <CardContent>
-              {clientSecret && (
+              {clientSecret ? (
                 <PaymentElement id="payment-element" options={{layout: "tabs"}} />
+              ) : (
+                <div className="text-center text-muted-foreground py-4">Initializing payment form...</div>
               )}
               {paymentError && <p className="text-sm font-medium text-destructive mt-4">{paymentError}</p>}
             </CardContent>

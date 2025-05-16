@@ -64,7 +64,7 @@ export interface Order {
     postalCode: string;
     country: string;
   } | null;
-  paymentIntentId?: string | null; // Added for Stripe integration
+  paymentIntentId?: string | null; 
   createdAt?: any;
   updatedAt?: any;
 }
