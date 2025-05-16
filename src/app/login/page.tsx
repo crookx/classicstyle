@@ -7,7 +7,7 @@ import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
-  Form as ShadcnForm,
+  Form as ShadcnForm, // Renamed to avoid conflict
   FormControl,
   FormField,
   FormItem,
@@ -28,6 +28,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
 import { Loader2 } from 'lucide-react';
+import { auth } from '@/lib/firebase'; // Import auth for password reset
+import { sendPasswordResetEmail } from 'firebase/auth';
 
 const loginSchema = z.object({
   email: z.string().email({ message: 'Invalid email address.' }),
@@ -51,76 +53,44 @@ const signupSchema = z
     path: ['confirmPassword'],
   });
 
+const resetPasswordSchema = z.object({
+  email: z.string().email({ message: 'Invalid email address.' }),
+});
+
 type LoginFormValues = z.infer<typeof loginSchema>;
 type SignupFormValues = z.infer<typeof signupSchema>;
+type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
 
 const RHFForm = FormProvider; // Alias for react-hook-form's FormProvider
 
+type AuthView = 'login' | 'signup' | 'resetPassword';
+
 export default function LoginPage() {
-  const { login, signup, currentUser, isAdmin, loading: authLoading, refreshAuthToken } = useAuth();
+  const { login, signup, currentUser, isAdmin, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectPath = searchParams.get('redirect') || '/';
 
-  const [isLoginView, setIsLoginView] = useState(true);
+  const [authView, setAuthView] = useState<AuthView>('login');
   const [authError, setAuthError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
 
-
   useEffect(() => {
-    if (!authLoading && currentUser && isAdmin !== null) { // Wait for isAdmin to be determined
+    if (!authLoading && currentUser && isAdmin !== null) {
       setIsRedirecting(true);
       if (isAdmin) {
         router.push(redirectPath.startsWith('/admin') ? redirectPath : '/admin');
       } else {
-        router.push(redirectPath === '/admin' ? '/' : redirectPath); // Avoid redirecting non-admin to /admin
+        router.push(redirectPath === '/admin' ? '/' : redirectPath);
       }
     }
   }, [currentUser, isAdmin, authLoading, router, redirectPath]);
 
-  async function onLoginSubmit(values: LoginFormValues) {
-    setAuthError(null);
-    setIsSubmitting(true);
-    try {
-      await login(values.email, values.password);
-      // refreshAuthToken will be called by AuthContext, then useEffect will handle redirection
-      toast({
-        title: 'Login Successful!',
-        description: 'Welcome back. Redirecting...',
-      });
-      // Redirection is handled by useEffect
-    } catch (error: any) {
-      handleAuthError(error, 'Login Failed');
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  async function onSignupSubmit(values: SignupFormValues) {
-    setAuthError(null);
-    setIsSubmitting(true);
-    try {
-      await signup(values.email, values.password);
-      toast({
-        title: 'Signup Successful!',
-        description: 'Welcome! Your account has been created. Please log in.',
-      });
-      setIsLoginView(true);
-      loginForm.setValue('email', values.email);
-      loginForm.resetField('password');
-      signupForm.reset({ email: '', password: '', confirmPassword: '' });
-    } catch (error: any) {
-      handleAuthError(error, 'Signup Failed');
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
   const handleAuthError = (
     error: any,
-    type: 'Login Failed' | 'Signup Failed'
+    type: 'Login Failed' | 'Signup Failed' | 'Password Reset Failed'
   ) => {
     let message = 'An unexpected error occurred. Please try again.';
     if (error.code) {
@@ -144,7 +114,71 @@ export default function LoginPage() {
       }
     }
     setAuthError(message);
+    toast({ title: type, description: message, variant: 'destructive' });
   };
+  
+  async function onLoginSubmit(values: LoginFormValues) {
+    setAuthError(null);
+    setIsSubmitting(true);
+    try {
+      await login(values.email, values.password);
+      toast({
+        title: 'Login Successful!',
+        description: 'Welcome back. Redirecting...',
+      });
+    } catch (error: any) {
+      handleAuthError(error, 'Login Failed');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function onSignupSubmit(values: SignupFormValues) {
+    setAuthError(null);
+    setIsSubmitting(true);
+    try {
+      await signup(values.email, values.password);
+      toast({
+        title: 'Signup Successful!',
+        description: 'Welcome! Your account has been created. Please log in.',
+      });
+      setAuthView('login');
+      loginForm.setValue('email', values.email);
+      loginForm.resetField('password');
+      signupForm.reset({ email: '', password: '', confirmPassword: '' });
+    } catch (error: any) {
+      handleAuthError(error, 'Signup Failed');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function onResetPasswordSubmit(values: ResetPasswordFormValues) {
+    setAuthError(null);
+    setIsSubmitting(true);
+    try {
+      await sendPasswordResetEmail(auth, values.email);
+      toast({
+        title: 'Password Reset Email Sent',
+        description: 'If an account exists for this email, a password reset link has been sent. Please check your inbox (and spam folder).',
+      });
+      setAuthView('login'); // Go back to login view
+      resetPasswordForm.reset();
+    } catch (error: any) {
+      // Firebase often doesn't reveal if an email exists for security reasons.
+      // So, a generic success message is usually best even on error, unless it's a clear network issue.
+      if (error.code === 'auth/user-not-found') {
+         toast({
+          title: 'Password Reset Email Sent',
+          description: 'If an account exists for this email, a password reset link has been sent. Please check your inbox (and spam folder).',
+        });
+      } else {
+        handleAuthError(error, 'Password Reset Failed');
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
 
   const loginForm = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -156,11 +190,17 @@ export default function LoginPage() {
     defaultValues: { email: '', password: '', confirmPassword: '' },
   });
 
-  const toggleView = () => {
-    setIsLoginView(!isLoginView);
+  const resetPasswordForm = useForm<ResetPasswordFormValues>({
+    resolver: zodResolver(resetPasswordSchema),
+    defaultValues: { email: '' },
+  });
+
+  const toggleView = (view: AuthView) => {
+    setAuthView(view);
     setAuthError(null);
-    loginForm.reset({ email: '', password: '' }, { keepValues: false, keepDirty: false, keepErrors: false, keepTouched: false, keepIsValid: false });
-    signupForm.reset({ email: '', password: '', confirmPassword: '' }, { keepValues: false, keepDirty: false, keepErrors: false, keepTouched: false, keepIsValid: false });
+    loginForm.reset({ email: '', password: '' });
+    signupForm.reset({ email: '', password: '', confirmPassword: '' });
+    resetPasswordForm.reset({ email: ''});
     setIsSubmitting(false);
   };
 
@@ -174,168 +214,184 @@ export default function LoginPage() {
       </div>
     );
   }
-  
-  // Avoid rendering form if already logged in and about to redirect (covered by above)
-  if (!authLoading && currentUser && !isRedirecting) {
-     setIsRedirecting(true); // Trigger redirect state
-     return null; // or the loading spinner again
-  }
 
+  if (!authLoading && currentUser && !isRedirecting) {
+    setIsRedirecting(true);
+    return null;
+  }
 
   return (
     <div className="flex items-center justify-center py-12 px-4">
       <Card className="w-full max-w-md shadow-xl rounded-xl">
-        <CardHeader className="text-center">
-          <CardTitle className="text-3xl font-serif">
-            {isLoginView ? 'Welcome Back' : 'Create Account'}
-          </CardTitle>
-          <CardDescription>
-            {isLoginView
-              ? 'Log in to continue to ClassicStyle.'
-              : 'Sign up to discover timeless elegance.'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoginView ? (
-            <RHFForm {...loginForm} >
-              <form
-                key="login-html-form"
-                onSubmit={loginForm.handleSubmit(onLoginSubmit)}
-                className="space-y-6"
-              >
-                <FormField
-                  control={loginForm.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="email"
-                          placeholder="you@example.com"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={loginForm.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Password</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="password"
-                          placeholder="••••••••"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                {authError && isLoginView && (
-                  <p className="text-sm font-medium text-destructive">
-                    {authError}
-                  </p>
-                )}
-                <Button
-                  type="submit"
-                  className="w-full text-lg"
-                  disabled={isSubmitting}
+        {authView === 'login' && (
+          <>
+            <CardHeader className="text-center">
+              <CardTitle className="text-3xl font-serif">Welcome Back</CardTitle>
+              <CardDescription>Log in to continue to ClassicStyle.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <RHFForm {...loginForm}>
+                <form
+                  key="login-html-form" // Added key
+                  onSubmit={loginForm.handleSubmit(onLoginSubmit)}
+                  className="space-y-6"
                 >
-                  {isSubmitting && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
-                  {isSubmitting ? 'Logging in...' : 'Log In'}
+                  <FormField
+                    control={loginForm.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl><Input type="email" placeholder="you@example.com" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={loginForm.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Password</FormLabel>
+                        <FormControl><Input type="password" placeholder="••••••••" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  {authError && authView === 'login' && (
+                    <p className="text-sm font-medium text-destructive">{authError}</p>
+                  )}
+                  <Button type="submit" className="w-full text-lg" disabled={isSubmitting}>
+                    {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
+                    {isSubmitting ? 'Logging in...' : 'Log In'}
+                  </Button>
+                </form>
+              </RHFForm>
+              <div className="mt-4 text-center text-sm">
+                <Button variant="link" onClick={() => toggleView('resetPassword')} className="px-0">
+                  Forgot Password?
                 </Button>
-              </form>
-            </RHFForm>
-          ) : (
-            <RHFForm {...signupForm}>
-              <form
-                key="signup-html-form"
-                onSubmit={signupForm.handleSubmit(onSignupSubmit)}
-                className="space-y-6"
-              >
-                <FormField
-                  control={signupForm.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="email"
-                          placeholder="you@example.com"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={signupForm.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Password</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="password"
-                          placeholder="Create a password (min. 6 characters)"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={signupForm.control}
-                  name="confirmPassword"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Confirm Password</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="password"
-                          placeholder="Confirm your password"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                {authError && !isLoginView && (
-                  <p className="text-sm font-medium text-destructive">
-                    {authError}
-                  </p>
-                )}
-                <Button
-                  type="submit"
-                  className="w-full text-lg"
-                  disabled={isSubmitting}
+              </div>
+            </CardContent>
+            <CardFooter className="flex flex-col items-center">
+              <Separator className="my-4" />
+              <Button variant="link" onClick={() => toggleView('signup')}>
+                Don't have an account? Sign Up
+              </Button>
+            </CardFooter>
+          </>
+        )}
+
+        {authView === 'signup' && (
+          <>
+            <CardHeader className="text-center">
+              <CardTitle className="text-3xl font-serif">Create Account</CardTitle>
+              <CardDescription>Sign up to discover timeless elegance.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <RHFForm {...signupForm}>
+                <form
+                  key="signup-html-form" // Added key
+                  onSubmit={signupForm.handleSubmit(onSignupSubmit)}
+                  className="space-y-6"
                 >
-                  {isSubmitting && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
-                  {isSubmitting ? 'Signing up...' : 'Sign Up'}
-                </Button>
-              </form>
-            </RHFForm>
-          )}
-        </CardContent>
-        <CardFooter className="flex flex-col items-center">
-          <Separator className="my-4" />
-          <Button variant="link" onClick={toggleView}>
-            {isLoginView
-              ? "Don't have an account? Sign Up"
-              : 'Already have an account? Log In'}
-          </Button>
-        </CardFooter>
+                  <FormField
+                    control={signupForm.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl><Input type="email" placeholder="you@example.com" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={signupForm.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Password</FormLabel>
+                        <FormControl><Input type="password" placeholder="Create a password (min. 6 characters)" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={signupForm.control}
+                    name="confirmPassword"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Confirm Password</FormLabel>
+                        <FormControl><Input type="password" placeholder="Confirm your password" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  {authError && authView === 'signup' && (
+                    <p className="text-sm font-medium text-destructive">{authError}</p>
+                  )}
+                  <Button type="submit" className="w-full text-lg" disabled={isSubmitting}>
+                    {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
+                    {isSubmitting ? 'Signing up...' : 'Sign Up'}
+                  </Button>
+                </form>
+              </RHFForm>
+            </CardContent>
+            <CardFooter className="flex flex-col items-center">
+              <Separator className="my-4" />
+              <Button variant="link" onClick={() => toggleView('login')}>
+                Already have an account? Log In
+              </Button>
+            </CardFooter>
+          </>
+        )}
+        
+        {authView === 'resetPassword' && (
+          <>
+            <CardHeader className="text-center">
+              <CardTitle className="text-3xl font-serif">Reset Password</CardTitle>
+              <CardDescription>Enter your email to receive a password reset link.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <RHFForm {...resetPasswordForm}>
+                <form
+                  key="reset-password-html-form"
+                  onSubmit={resetPasswordForm.handleSubmit(onResetPasswordSubmit)}
+                  className="space-y-6"
+                >
+                  <FormField
+                    control={resetPasswordForm.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email Address</FormLabel>
+                        <FormControl><Input type="email" placeholder="you@example.com" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  {authError && authView === 'resetPassword' && (
+                    <p className="text-sm font-medium text-destructive">{authError}</p>
+                  )}
+                  <Button type="submit" className="w-full text-lg" disabled={isSubmitting}>
+                    {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
+                    {isSubmitting ? 'Sending...' : 'Send Reset Link'}
+                  </Button>
+                </form>
+              </RHFForm>
+            </CardContent>
+            <CardFooter className="flex flex-col items-center">
+              <Separator className="my-4" />
+              <Button variant="link" onClick={() => toggleView('login')}>
+                Back to Log In
+              </Button>
+            </CardFooter>
+          </>
+        )}
       </Card>
     </div>
   );
 }
+
+    
