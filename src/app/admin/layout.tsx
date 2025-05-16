@@ -3,11 +3,10 @@
 
 import { type ReactNode, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter, usePathname } from 'next/navigation'; // Added usePathname
+import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { SiteLogo } from '@/components/layout/SiteLogo'; // Kept for potential use in sidebar header
-import { Separator } from '@/components/ui/separator';
+import { SiteLogo } from '@/components/layout/SiteLogo';
 import { Input } from '@/components/ui/input';
 import {
   LayoutDashboard,
@@ -33,27 +32,26 @@ import {
   SidebarMenuButton,
   SidebarTrigger,
   SidebarInset,
-  useSidebar, // To potentially control sidebar from within the layout if needed
-} from '@/components/ui/sidebar'; // Assuming sidebar.tsx is correctly set up
+} from '@/components/ui/sidebar';
 
 const navItems = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/products', label: 'Products', icon: Package },
-  { href: '/admin/orders', label: 'Orders', icon: ShoppingCart, disabled: true }, // Placeholder
-  { href: '/admin/customers', label: 'Customers', icon: Users, disabled: true }, // Placeholder
-  { href: '/admin/analytics', label: 'Analytics', icon: BarChart3, disabled: true }, // Placeholder
-  { href: '/admin/settings', label: 'Settings', icon: Settings, disabled: true }, // Placeholder
+  { href: '/admin/orders', label: 'Orders', icon: ShoppingCart }, 
+  { href: '/admin/customers', label: 'Customers', icon: Users }, 
+  { href: '/admin/analytics', label: 'Analytics', icon: BarChart3 }, 
+  { href: '/admin/settings', label: 'Settings', icon: Settings }, 
 ];
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const { currentUser, loading, logout } = useAuth();
   const router = useRouter();
-  const pathname = usePathname(); // Get current path
+  const pathname = usePathname(); 
   const { toast } = useToast();
 
   useEffect(() => {
     if (!loading && !currentUser) {
-      router.push(`/login?redirect=${pathname}`); // Redirect to login with current path
+      router.push(`/login?redirect=${pathname}`); 
     }
   }, [currentUser, loading, router, pathname]);
 
@@ -98,9 +96,8 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               <SidebarMenuItem key={item.label}>
                 <SidebarMenuButton
                   asChild
-                  isActive={pathname === item.href}
+                  isActive={pathname === item.href || (item.href !== '/admin' && pathname.startsWith(item.href))} // More robust active check
                   tooltip={item.label}
-                  disabled={item.disabled}
                   className={item.disabled ? "cursor-not-allowed opacity-50" : ""}
                 >
                   <Link href={item.disabled ? "#" : item.href}>
@@ -134,7 +131,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
       <SidebarInset>
         <header className="sticky top-0 z-40 flex h-14 items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-6 shadow-sm">
-          <div className="md:hidden"> {/* Show trigger only on mobile where sidebar is initially hidden */}
+          <div className="md:hidden"> 
              <SidebarTrigger />
           </div>
           <div className="relative flex-1">
