@@ -23,11 +23,9 @@ This script is used to populate your Firebase Firestore database with initial pr
       match /databases/{database}/documents {
         match /products/{productId} {
           allow read: if true;
-          // Write access for the script is handled by admin privileges
         }
         match /collections/{collectionId} {
           allow read: if true;
-          // Write access for the script is handled by admin privileges
         }
       }
     }
@@ -42,15 +40,16 @@ This script is used to populate your Firebase Firestore database with initial pr
     yarn add --dev ts-node typescript @types/node
     yarn add firebase-admin
     ```
+5.  **Package.json type**: Ensure your `package.json` in the project root contains `"type": "module"` to correctly run ESM scripts.
 
 ### How to Run
 
-1.  Ensure all prerequisites are met, especially the `serviceAccountKey.json` file placement and Firestore rules.
+1.  Ensure all prerequisites are met, especially the `serviceAccountKey.json` file placement, Firestore rules, and `package.json` type setting.
 2.  Open your terminal in the **root directory of your project**.
 3.  Execute the script using the following command:
 
     ```bash
-    node --loader ts-node/esm ./scripts/populateFirestore.ts
+    node --import=ts-node/esm ./scripts/populateFirestore.ts
     ```
 
 4.  The script will log its progress to the console. Upon successful completion, your `products` and `collections` collections in Firestore should be populated.
@@ -62,3 +61,4 @@ This script is used to populate your Firebase Firestore database with initial pr
 *   The `databaseURL` in `populateFirestore.ts` should match your Firebase project's database URL (usually `https://<YOUR_PROJECT_ID>.firebaseio.com` or `https://<YOUR_PROJECT_ID>.firestore.io`). The script currently has a placeholder for `clothstore-25546`.
 *   The `serviceAccount` import in `populateFirestore.ts` is cast to `admin.ServiceAccount` to satisfy TypeScript, as direct JSON imports sometimes don't carry precise type information for complex objects.
 *   Batches are re-initialized after each commit to prevent errors with using an already committed batch.
+
