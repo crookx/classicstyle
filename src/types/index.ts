@@ -22,7 +22,7 @@ export interface Product {
   tags?: string[] | null;
   sku?: string | null;
   isFeatured?: boolean | null;
-  stock: number; // Added for inventory management
+  stock: number;
   createdAt?: any; // Firestore Timestamp
   updatedAt?: any; // Firestore Timestamp
 }
@@ -47,7 +47,7 @@ export interface OrderItem {
   imageUrl?: string | null; // Optional image for quick view in order summary
 }
 
-export type OrderStatus = 'Pending' | 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled';
+export type OrderStatus = 'Pending' | 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled' | 'PaymentFailed';
 
 export interface Order {
   id: string; // Firestore document ID
@@ -64,6 +64,7 @@ export interface Order {
     postalCode: string;
     country: string;
   } | null;
+  paymentIntentId?: string | null; // Added for Stripe integration
   createdAt?: any;
   updatedAt?: any;
 }
@@ -84,11 +85,10 @@ export interface UserCartItem {
   productId: string;
   quantity: number;
   addedAt: any; // Firestore Timestamp
-  // Note: Full product details are fetched separately for display
 }
 
 export interface UserCartDocument {
-  userId: string; // Should match the document ID for /carts/{userId}
+  userId: string;
   items: UserCartItem[];
   lastUpdatedAt: any; // Firestore Timestamp
 }
@@ -99,13 +99,13 @@ export interface UserWishlistItem {
   addedAt: any; // Firestore Timestamp
 }
 export interface UserWishlistDocument {
-  userId: string; // Should match the document ID for /wishlists/{userId}
-  productIds: string[]; // Storing only product IDs
+  userId: string;
+  productIds: string[];
   lastUpdatedAt: any; // Firestore Timestamp
 }
 
 // For CartContext display, combining UserCartItem with full Product details
 export interface DisplayCartItem extends Product {
-  quantityInCart: number; // Renamed from 'quantity' to avoid clash with Product.stock
+  quantityInCart: number;
   addedAt: any;
 }
