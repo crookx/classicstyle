@@ -1,17 +1,19 @@
 
+'use client';
+
+import { useEffect, useState } from 'react';
 import { getOrderById } from '@/lib/firebase/firestoreService';
-import { notFound } from 'next/navigation';
+import { notFound, useParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { format } from 'date-fns';
 import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
-import type { OrderStatus } from '@/types';
-import UpdateOrderStatusForm from './UpdateOrderStatusForm'; // Client component for form
-
-interface OrderDetailPageProps {
-  params: { orderId: string };
-}
+import type { Order, OrderStatus } from '@/types';
+import UpdateOrderStatusForm from './UpdateOrderStatusForm';
+import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'next/navigation'; // For redirecting if not authenticated
+import { Loader2, AlertTriangle } from 'lucide-react';
 
 const statusColors: Record<OrderStatus, string> = {
   Pending: "bg-yellow-500/20 text-yellow-700 border-yellow-500/50",
@@ -21,12 +23,81 @@ const statusColors: Record<OrderStatus, string> = {
   Cancelled: "bg-red-500/20 text-red-700 border-red-500/50",
 };
 
+export default function OrderDetailPage() {
+  const params = useParams();
+  const orderId = params.orderId as string;
+  
+  const [order, setOrder] = useState<Order | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  const { currentUser, loading: authLoading } = useAuth();
+  const router = useRouter();
 
-export default async function OrderDetailPage({ params }: OrderDetailPageProps) {
-  const order = await getOrderById(params.orderId);
+  useEffect(() => {
+    if (!authLoading && !currentUser) {
+      router.push(`/login?redirect=/admin/orders/${orderId}`);
+      return;
+    }
+
+    if (currentUser && orderId) {
+      const fetchOrder = async () => {
+        setIsLoading(true);
+        setError(null);
+        try {
+          const fetchedOrder = await getOrderById(orderId);
+          if (fetchedOrder) {
+            setOrder(fetchedOrder);
+          } else {
+            setError("Order not found.");
+          }
+        } catch (e: any) {
+          console.error("Error fetching order:", e);
+          setError("Failed to load order details. " + (e.message.includes("permission") ? "Check Firestore permissions." : e.message));
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      fetchOrder();
+    }
+  }, [currentUser, authLoading, orderId, router]);
+
+  if (authLoading || isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="ml-4 text-lg text-muted-foreground">Loading order details...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] text-center">
+        <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
+        <h2 className="text-xl font-semibold text-destructive">Error Loading Order</h2>
+        <p className="text-muted-foreground">{error}</p>
+        <Button onClick={() => router.push('/admin/orders')} variant="outline" className="mt-4">
+          Back to Orders
+        </Button>
+      </div>
+    );
+  }
 
   if (!order) {
-    notFound();
+    // This case might be covered by error state if getOrderById returns null and sets error
+    // Or could call notFound() from next/navigation if preferred for strict 404.
+    // For now, relying on the error state.
+    return (
+         <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] text-center">
+            <AlertTriangle className="h-12 w-12 text-muted-foreground mb-4" />
+            <h2 className="text-xl font-semibold">Order Not Found</h2>
+            <p className="text-muted-foreground">The requested order could not be found.</p>
+             <Button onClick={() => router.push('/admin/orders')} variant="outline" className="mt-4">
+                Back to Orders
+            </Button>
+        </div>
+    );
   }
 
   return (
@@ -123,3 +194,5 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
     </div>
   );
 }
+
+    
