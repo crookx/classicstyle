@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
@@ -13,14 +13,19 @@ import { Loader2 } from 'lucide-react';
 interface UpdateOrderStatusFormProps {
   orderId: string;
   currentStatus: OrderStatus;
+  onStatusUpdateSuccess?: (newStatus: OrderStatus) => void;
 }
 
 const availableStatuses: OrderStatus[] = ['Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled'];
 
-export default function UpdateOrderStatusForm({ orderId, currentStatus }: UpdateOrderStatusFormProps) {
+export default function UpdateOrderStatusForm({ orderId, currentStatus, onStatusUpdateSuccess }: UpdateOrderStatusFormProps) {
   const [selectedStatus, setSelectedStatus] = useState<OrderStatus>(currentStatus);
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
+
+  useEffect(() => {
+    setSelectedStatus(currentStatus);
+  }, [currentStatus]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -37,18 +42,15 @@ export default function UpdateOrderStatusForm({ orderId, currentStatus }: Update
       formData.append('orderId', orderId);
       formData.append('status', selectedStatus);
 
-      // Log formData for debugging
-      // console.log("FormData to be sent:", {
-      //   orderId: formData.get('orderId'),
-      //   status: formData.get('status'),
-      // });
-
       const result = await updateOrderStatusAction(formData);
-      if (result.success) {
+      if (result.success && result.newStatus) {
         toast({
           title: 'Order Status Updated',
-          description: `Order ${orderId} status changed to ${selectedStatus}.`,
+          description: `Order ${result.orderId} status changed to ${result.newStatus}.`,
         });
+        if (onStatusUpdateSuccess) {
+          onStatusUpdateSuccess(result.newStatus);
+        }
         // The page should revalidate due to revalidatePath in the server action.
       } else {
         toast({
@@ -56,6 +58,7 @@ export default function UpdateOrderStatusForm({ orderId, currentStatus }: Update
           description: result.error || 'An unexpected error occurred.',
           variant: 'destructive',
         });
+        console.error("Error updating status from form:", result);
       }
     });
   };

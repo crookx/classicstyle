@@ -14,6 +14,7 @@ import { format } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useToast } from '@/hooks/use-toast'; // Import useToast
 
 export default function AdminCustomersPage() {
   const [customers, setCustomers] = useState<UserProfile[]>([]);
@@ -21,6 +22,7 @@ export default function AdminCustomersPage() {
   const [error, setError] = useState<string | null>(null);
   const { currentUser, isAdmin, loading: authLoading } = useAuth();
   const router = useRouter();
+  const { toast } = useToast(); // Initialize toast
 
   useEffect(() => {
     if (!authLoading) {
@@ -28,36 +30,33 @@ export default function AdminCustomersPage() {
         router.push('/login?redirect=/admin/customers');
         return;
       }
+      if (currentUser && isAdmin) {
+        const loadCustomers = async () => {
+          setIsLoading(true);
+          setError(null);
+          try {
+            const fetchedCustomers = await fetchUsersFromDB();
+            setCustomers(fetchedCustomers);
+          } catch (e: any) {
+            console.error("Error fetching customers:", e);
+            setError("Failed to load customers. " + (e.message.includes("permission") ? "Check Firestore permissions." : e.message));
+          } finally {
+            setIsLoading(false);
+          }
+        };
+        loadCustomers();
+      }
     }
   }, [currentUser, isAdmin, authLoading, router]);
 
-  useEffect(() => {
-    if (currentUser && isAdmin) {
-      const loadCustomers = async () => {
-        setIsLoading(true);
-        setError(null);
-        try {
-          const fetchedCustomers = await fetchUsersFromDB();
-          setCustomers(fetchedCustomers);
-        } catch (e: any) {
-          console.error("Error fetching customers:", e);
-           setError("Failed to load customers. " + (e.message.includes("permission") ? "Check Firestore permissions." : e.message));
-        } finally {
-          setIsLoading(false);
-        }
-      };
-      loadCustomers();
-    } else if (!authLoading && currentUser && isAdmin === false) {
-        // Non-admin user, handled by outer useEffect, but set loading false if it runs
-        setIsLoading(false);
-    } else if (!authLoading && !currentUser) {
-        // No user, handled by outer useEffect
-        setIsLoading(false);
-    }
+  const handleCustomerAction = (action: string, customerName: string) => {
+    toast({
+      title: 'Action Clicked',
+      description: `${action} for ${customerName} (Not yet implemented).`,
+    });
+  };
 
-  }, [currentUser, isAdmin, authLoading]);
-
-  if (authLoading || isLoading) {
+  if (authLoading || (isLoading && (!currentUser || isAdmin === null))) {
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -124,16 +123,21 @@ export default function AdminCustomersPage() {
                     <TableCell className="text-right">
                        <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          {/* Removed disabled from Button to make the trigger clickable */}
                           <Button variant="ghost" size="icon"> 
                             <MoreVertical className="h-4 w-4" />
                              <span className="sr-only">Customer Actions</span>
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem disabled><UserCircle className="mr-2 h-4 w-4"/>View Profile</DropdownMenuItem>
-                          <DropdownMenuItem disabled><ShoppingBag className="mr-2 h-4 w-4"/>View Orders</DropdownMenuItem>
-                          <DropdownMenuItem disabled><Mail className="mr-2 h-4 w-4"/>Send Email</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleCustomerAction('View Profile', customer.displayName || customer.email)}>
+                            <UserCircle className="mr-2 h-4 w-4"/>View Profile
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleCustomerAction('View Orders', customer.displayName || customer.email)}>
+                            <ShoppingBag className="mr-2 h-4 w-4"/>View Orders
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleCustomerAction('Send Email', customer.displayName || customer.email)}>
+                            <Mail className="mr-2 h-4 w-4"/>Send Email
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>

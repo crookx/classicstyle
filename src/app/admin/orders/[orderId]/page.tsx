@@ -1,18 +1,17 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { getOrderById } from '@/lib/firebase/firestoreService';
-import { notFound, useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
+import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
 import type { Order, OrderStatus } from '@/types';
 import UpdateOrderStatusForm from './UpdateOrderStatusForm';
 import { useAuth } from '@/contexts/AuthContext';
-import { useRouter } from 'next/navigation'; // For redirecting if not authenticated
 import { Loader2, AlertTriangle } from 'lucide-react';
 
 const statusColors: Record<OrderStatus, string> = {
@@ -31,36 +30,50 @@ export default function OrderDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  const { currentUser, loading: authLoading } = useAuth();
+  const { currentUser, isAdmin, loading: authLoading } = useAuth();
   const router = useRouter();
 
-  useEffect(() => {
-    if (!authLoading && !currentUser) {
-      router.push(`/login?redirect=/admin/orders/${orderId}`);
-      return;
+  const fetchOrder = useCallback(async () => {
+    if (!orderId) return;
+    setIsLoading(true);
+    setError(null);
+    try {
+      const fetchedOrder = await getOrderById(orderId);
+      if (fetchedOrder) {
+        setOrder(fetchedOrder);
+      } else {
+        setError("Order not found.");
+      }
+    } catch (e: any) {
+      console.error("Error fetching order:", e);
+      setError("Failed to load order details. " + (e.message.includes("permission") ? "Check Firestore permissions." : e.message));
+    } finally {
+      setIsLoading(false);
     }
+  }, [orderId]);
 
-    if (currentUser && orderId) {
-      const fetchOrder = async () => {
-        setIsLoading(true);
-        setError(null);
-        try {
-          const fetchedOrder = await getOrderById(orderId);
-          if (fetchedOrder) {
-            setOrder(fetchedOrder);
-          } else {
-            setError("Order not found.");
-          }
-        } catch (e: any) {
-          console.error("Error fetching order:", e);
-          setError("Failed to load order details. " + (e.message.includes("permission") ? "Check Firestore permissions." : e.message));
-        } finally {
-          setIsLoading(false);
-        }
-      };
-      fetchOrder();
+  useEffect(() => {
+    if (!authLoading) {
+      if (!currentUser) {
+        router.push(`/login?redirect=/admin/orders/${orderId}`);
+        return;
+      }
+      if (isAdmin === false) {
+        router.push('/admin'); // Or some other appropriate non-admin page
+        return;
+      }
+      if (currentUser && isAdmin) {
+        fetchOrder();
+      }
     }
-  }, [currentUser, authLoading, orderId, router]);
+  }, [currentUser, isAdmin, authLoading, orderId, router, fetchOrder]);
+
+  const handleStatusUpdateSuccess = (newStatus: OrderStatus) => {
+    // Re-fetch order or update local state to reflect the change immediately
+    setOrder(prevOrder => prevOrder ? { ...prevOrder, status: newStatus, updatedAt: new Date().toISOString() } : null);
+    // fetchOrder(); // Or re-fetch for full consistency
+  };
+
 
   if (authLoading || isLoading) {
     return (
@@ -85,9 +98,6 @@ export default function OrderDetailPage() {
   }
 
   if (!order) {
-    // This case might be covered by error state if getOrderById returns null and sets error
-    // Or could call notFound() from next/navigation if preferred for strict 404.
-    // For now, relying on the error state.
     return (
          <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] text-center">
             <AlertTriangle className="h-12 w-12 text-muted-foreground mb-4" />
@@ -187,12 +197,14 @@ export default function OrderDetailPage() {
             <CardDescription>Change the current status of this order.</CardDescription>
         </CardHeader>
         <CardContent>
-            <UpdateOrderStatusForm orderId={order.id} currentStatus={order.status} />
+            <UpdateOrderStatusForm 
+              orderId={order.id} 
+              currentStatus={order.status} 
+              onStatusUpdateSuccess={handleStatusUpdateSuccess}
+            />
         </CardContent>
       </Card>
 
     </div>
   );
 }
-
-    
