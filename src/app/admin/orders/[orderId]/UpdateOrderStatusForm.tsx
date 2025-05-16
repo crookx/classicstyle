@@ -16,6 +16,14 @@ interface UpdateOrderStatusFormProps {
   onStatusUpdateSuccess?: (newStatus: OrderStatus) => void;
 }
 
+// Define expected shape of the action result for clarity on client-side
+interface OrderActionResult {
+  success: boolean;
+  error?: string;
+  orderId?: string;
+  newStatus?: OrderStatus;
+}
+
 const availableStatuses: OrderStatus[] = ['Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled'];
 
 export default function UpdateOrderStatusForm({ orderId, currentStatus, onStatusUpdateSuccess }: UpdateOrderStatusFormProps) {
@@ -42,23 +50,41 @@ export default function UpdateOrderStatusForm({ orderId, currentStatus, onStatus
       formData.append('orderId', orderId);
       formData.append('status', selectedStatus);
 
-      const result = await updateOrderStatusAction(formData);
-      if (result.success && result.newStatus) {
-        toast({
-          title: 'Order Status Updated',
-          description: `Order ${result.orderId} status changed to ${result.newStatus}.`,
-        });
-        if (onStatusUpdateSuccess) {
-          onStatusUpdateSuccess(result.newStatus);
+      try {
+        const result: OrderActionResult = await updateOrderStatusAction(formData); 
+        
+        console.log("Client received result from action:", JSON.stringify(result, null, 2));
+
+        if (result && result.success && result.newStatus) {
+          toast({
+            title: 'Order Status Updated',
+            description: `Order ${result.orderId || orderId} status changed to ${result.newStatus}.`,
+          });
+          if (onStatusUpdateSuccess) {
+            onStatusUpdateSuccess(result.newStatus);
+          }
+        } else {
+          const errorMessage = result?.error || 'An unexpected error occurred while updating status. No specific error message received from server.';
+          toast({
+            title: 'Error Updating Status',
+            description: errorMessage,
+            variant: 'destructive',
+          });
+          console.error("Error updating status from form. Full result object:", result, "Generated error message:", errorMessage);
         }
-        // The page should revalidate due to revalidatePath in the server action.
-      } else {
+      } catch (error) {
+        console.error("Exception during updateOrderStatusAction call from client:", error);
+        let message = 'Failed to process the request due to a client-side or network error.';
+        if (error instanceof Error) {
+            message = error.message;
+        } else if (typeof error === 'string') {
+            message = error;
+        }
         toast({
-          title: 'Error Updating Status',
-          description: result.error || 'An unexpected error occurred.',
+          title: 'Failed to Update Status',
+          description: message,
           variant: 'destructive',
         });
-        console.error("Error updating status from form:", result);
       }
     });
   };
