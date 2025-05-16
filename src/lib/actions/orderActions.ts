@@ -13,7 +13,8 @@ const UpdateOrderStatusSchema = z.object({
   }),
 });
 
-interface OrderActionResult {
+// Ensure this interface is exported and matches what the client expects
+export interface OrderActionResult {
   success: boolean;
   error?: string;
   orderId?: string;
@@ -22,26 +23,28 @@ interface OrderActionResult {
 
 export async function updateOrderStatusAction(formData: FormData): Promise<OrderActionResult> {
   console.log("[OrderAction] Entered updateOrderStatusAction.");
-  const rawData = {
-    orderId: formData.get('orderId') as string,
-    status: formData.get('status') as OrderStatus,
-  };
-  
-  console.log("[OrderAction] Received rawData for order status update:", JSON.stringify(rawData));
+  let actionResult: OrderActionResult;
 
-  try { // Outer try-catch for the entire action logic
+  try { // Super catch-all for the entire action
+    const rawData = {
+      orderId: formData.get('orderId') as string,
+      status: formData.get('status') as OrderStatus,
+    };
+    
+    console.log("[OrderAction] Received rawData for order status update:", JSON.stringify(rawData));
+
     const validation = UpdateOrderStatusSchema.safeParse(rawData);
 
     if (!validation.success) {
       const errorMessages = validation.error.flatten().fieldErrors;
-      console.error("[OrderAction] Update Order Status Validation Error:", JSON.stringify(errorMessages));
       const flatErrors = Object.values(errorMessages).flat().join(' ');
-      const result: OrderActionResult = { 
+      console.error("[OrderAction] Update Order Status Validation Error:", JSON.stringify(errorMessages));
+      actionResult = { 
         success: false, 
         error: "Invalid order status data. " + (flatErrors || "Unknown validation error.")
       };
-      console.log("[OrderAction] Returning validation error:", JSON.stringify(result));
-      return result;
+      console.log("[OrderAction] FINAL ACTION RESULT (Validation Error):", JSON.stringify(actionResult));
+      return actionResult;
     }
 
     const { orderId, status } = validation.data;
@@ -53,20 +56,26 @@ export async function updateOrderStatusAction(formData: FormData): Promise<Order
       console.log(`[OrderAction] Successfully updated status for order ${orderId} to ${status}. Revalidating paths.`);
       revalidatePath('/admin/orders');
       revalidatePath(`/admin/orders/${orderId}`);
-      const result: OrderActionResult = { success: true, orderId, newStatus: status };
-      console.log("[OrderAction] Returning success result:", JSON.stringify(result));
-      return result;
+      actionResult = { success: true, orderId, newStatus: status };
+      console.log("[OrderAction] FINAL ACTION RESULT (Success):", JSON.stringify(actionResult));
+      return actionResult;
     } else {
       console.error(`[OrderAction] Firestore update failed for order ${orderId}. updateOrderStatusInFirestore returned false.`);
-      const result: OrderActionResult = { success: false, error: "Failed to update order status in the database.", orderId };
-      console.log("[OrderAction] Returning Firestore update failure:", JSON.stringify(result));
-      return result;
+      actionResult = { success: false, error: "Failed to update order status in the database.", orderId };
+      console.log("[OrderAction] FINAL ACTION RESULT (Firestore Update Failure):", JSON.stringify(actionResult));
+      return actionResult;
     }
-  } catch (error) {
+  } catch (error: unknown) { // Catch any unexpected error during the action's execution
     console.error("[OrderAction] Unexpected error in updateOrderStatusAction:", error);
-    const errorMessage = error instanceof Error ? error.message : "An unknown server error occurred during action execution.";
-    const result: OrderActionResult = { success: false, error: `Server action error: ${errorMessage}` };
-    console.log("[OrderAction] Returning caught exception:", JSON.stringify(result));
-    return result;
+    let errorMessage = "An unknown server error occurred during action execution.";
+    if (error instanceof Error) {
+        errorMessage = error.message;
+    } else if (typeof error === 'string') {
+        errorMessage = error;
+    }
+    actionResult = { success: false, error: `Server action error: ${errorMessage}` };
+    console.log("[OrderAction] FINAL ACTION RESULT (Caught Exception):", JSON.stringify(actionResult));
+    return actionResult;
   }
 }
+
