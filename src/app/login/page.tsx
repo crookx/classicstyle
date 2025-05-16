@@ -1,13 +1,13 @@
 
 'use client';
 import { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, FormProvider } from 'react-hook-form'; // Ensured FormProvider is available if Form is an alias
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
-  Form,
+  Form as ShadcnForm, // Renamed to avoid conflict if FormProvider is also used as Form
   FormControl,
   FormField,
   FormItem,
@@ -107,11 +107,10 @@ export default function LoginPage() {
         title: 'Signup Successful!',
         description: 'Welcome! Your account has been created. Please log in.',
       });
-      // Switch to login view and prefill email
       setIsLoginView(true);
       loginForm.setValue('email', values.email);
-      loginForm.resetField('password'); 
-      signupForm.reset({ email: '', password: '', confirmPassword: '' }); // Fully reset signup form
+      loginForm.resetField('password');
+      signupForm.reset({ email: '', password: '', confirmPassword: '' });
     } catch (error: any) {
       handleAuthError(error, 'Signup Failed');
     } finally {
@@ -150,10 +149,10 @@ export default function LoginPage() {
   const toggleView = () => {
     setIsLoginView(!isLoginView);
     setAuthError(null);
+    // Reset forms to their default values and clear errors
+    loginForm.reset({ email: '', password: '' }, { keepValues: false, keepDirty: false, keepErrors: false, keepTouched: false, keepIsValid: false });
+    signupForm.reset({ email: '', password: '', confirmPassword: '' }, { keepValues: false, keepDirty: false, keepErrors: false, keepTouched: false, keepIsValid: false });
     setIsSubmitting(false);
-    // Explicitly reset forms to their default values
-    loginForm.reset({ email: '', password: '' });
-    signupForm.reset({ email: '', password: '', confirmPassword: '' });
   };
   
   if (authLoading && !currentUser) {
@@ -168,7 +167,6 @@ export default function LoginPage() {
   }
 
   if (!authLoading && currentUser) {
-    // This means user is already logged in and useEffect will redirect
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
@@ -176,6 +174,9 @@ export default function LoginPage() {
       </div>
     );
   }
+
+  // Using ShadcnForm as Form from react-hook-form is FormProvider
+  const RHFForm = FormProvider; 
 
   return (
     <div className="flex items-center justify-center py-12 px-4">
@@ -192,8 +193,9 @@ export default function LoginPage() {
         </CardHeader>
         <CardContent>
           {isLoginView ? (
-            <Form {...loginForm} key="login-form"> {/* Added key */}
+            <RHFForm {...loginForm} >
               <form
+                key="login-html-form" // Added key to HTML form
                 onSubmit={loginForm.handleSubmit(onLoginSubmit)}
                 className="space-y-6"
               >
@@ -245,10 +247,11 @@ export default function LoginPage() {
                   {isSubmitting ? 'Logging in...' : 'Log In'}
                 </Button>
               </form>
-            </Form>
+            </RHFForm>
           ) : (
-            <Form {...signupForm} key="signup-form"> {/* Added key */}
+            <RHFForm {...signupForm}>
               <form
+                key="signup-html-form" // Added key to HTML form
                 onSubmit={signupForm.handleSubmit(onSignupSubmit)}
                 className="space-y-6"
               >
@@ -317,7 +320,7 @@ export default function LoginPage() {
                   {isSubmitting ? 'Signing up...' : 'Sign Up'}
                 </Button>
               </form>
-            </Form>
+            </RHFForm>
           )}
         </CardContent>
         <CardFooter className="flex flex-col items-center">
