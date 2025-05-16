@@ -1,17 +1,58 @@
 
+'use client';
+
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ShoppingCart, MoreVertical, Eye } from "lucide-react";
+import { ShoppingCart, Eye, Loader2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { getOrders } from '@/lib/firebase/firestoreService';
+import { getOrders as fetchOrdersFromDB } from '@/lib/firebase/firestoreService';
 import type { Order } from '@/types';
 import { format } from 'date-fns';
 import Link from "next/link";
+import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'next/navigation';
 
-export default async function AdminOrdersPage() {
-  const orders: Order[] = await getOrders();
+export default function AdminOrdersPage() {
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { currentUser, loading: authLoading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!authLoading && !currentUser) {
+      router.push('/login?redirect=/admin/orders');
+      return;
+    }
+
+    if (currentUser) {
+      const loadOrders = async () => {
+        setIsLoading(true);
+        setError(null);
+        try {
+          const fetchedOrders = await fetchOrdersFromDB();
+          setOrders(fetchedOrders);
+        } catch (e: any) {
+          console.error("Error fetching orders:", e);
+          setError("Failed to load orders. " + (e.message.includes("permission") ? "Check Firestore permissions." : e.message));
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      loadOrders();
+    }
+  }, [currentUser, authLoading, router]);
+
+  if (authLoading || isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="ml-4 text-lg text-muted-foreground">Loading orders...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -20,9 +61,6 @@ export default async function AdminOrdersPage() {
           <h1 className="text-3xl font-serif font-bold">Manage Orders</h1>
           <p className="text-muted-foreground">View and process customer orders from Firestore.</p>
         </div>
-        {/* <Button disabled>
-            <ShoppingCart className="mr-2 h-5 w-5" /> Create New Order (Coming Soon)
-        </Button> */}
       </div>
       <Card className="shadow-xl rounded-xl">
         <CardHeader>
@@ -31,11 +69,15 @@ export default async function AdminOrdersPage() {
             Recent Orders
           </CardTitle>
           <CardDescription>
-            A list of {orders.length} customer orders fetched from Firestore.
+            {error ? (
+                <span className="text-destructive flex items-center"><AlertTriangle className="mr-2 h-4 w-4" />{error}</span>
+            ) : (
+                `A list of ${orders.length} customer orders fetched from Firestore.`
+            )}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {orders.length > 0 ? (
+          {!error && orders.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -60,11 +102,11 @@ export default async function AdminOrdersPage() {
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">KSh {order.totalAmount.toFixed(2)}</TableCell>
                     <TableCell className="text-center">
-                      <Badge 
+                      <Badge
                         variant={
                           order.status === "Shipped" ? "default" :
                           order.status === "Processing" ? "secondary" :
-                          order.status === "Delivered" ? "default" : 
+                          order.status === "Delivered" ? "default" :
                           order.status === "Cancelled" ? "destructive" :
                           "outline"
                         }
@@ -79,33 +121,18 @@ export default async function AdminOrdersPage() {
                           <a><Eye className="h-4 w-4" /></a>
                         </Button>
                       </Link>
-                      {/* Dropdown for more actions if needed in future
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreVertical className="h-4 w-4" />
-                            <span className="sr-only">Order Actions</span>
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem asChild>
-                            <Link href={`/admin/orders/${order.id}`}>View Details</Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem disabled>Update Status (on detail page)</DropdownMenuItem>
-                          <DropdownMenuItem disabled className="text-destructive">Cancel Order</DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                      */}
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           ) : (
-            <div className="text-center py-12 text-muted-foreground">
-              <ShoppingCart className="h-16 w-16 mx-auto mb-4 opacity-50" />
-              <p className="text-lg">No orders found in the database.</p>
-            </div>
+            !error && (
+              <div className="text-center py-12 text-muted-foreground">
+                <ShoppingCart className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                <p className="text-lg">No orders found in the database.</p>
+              </div>
+            )
           )}
         </CardContent>
       </Card>

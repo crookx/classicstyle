@@ -1,17 +1,59 @@
 
+'use client';
+
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Users, MoreVertical, Mail, ShoppingBag, UserCircle, AlertTriangle } from "lucide-react";
+import { Users, MoreVertical, Mail, ShoppingBag, UserCircle, AlertTriangle, Loader2 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { getUsers } from '@/lib/firebase/firestoreService';
+import { getUsers as fetchUsersFromDB } from '@/lib/firebase/firestoreService';
 import type { UserProfile } from '@/types';
 import { format } from 'date-fns';
+import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'next/navigation';
 
-export default async function AdminCustomersPage() {
-  const customers: UserProfile[] = await getUsers();
+export default function AdminCustomersPage() {
+  const [customers, setCustomers] = useState<UserProfile[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { currentUser, loading: authLoading } = useAuth();
+  const router = useRouter();
 
+  useEffect(() => {
+    if (!authLoading && !currentUser) {
+      router.push('/login?redirect=/admin/customers');
+      return;
+    }
+
+    if (currentUser) {
+      const loadCustomers = async () => {
+        setIsLoading(true);
+        setError(null);
+        try {
+          const fetchedCustomers = await fetchUsersFromDB();
+          setCustomers(fetchedCustomers);
+        } catch (e: any) {
+          console.error("Error fetching customers:", e);
+           setError("Failed to load customers. " + (e.message.includes("permission") ? "Check Firestore permissions." : e.message));
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      loadCustomers();
+    }
+  }, [currentUser, authLoading, router]);
+
+  if (authLoading || isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="ml-4 text-lg text-muted-foreground">Loading customers...</p>
+      </div>
+    );
+  }
+  
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
@@ -19,7 +61,7 @@ export default async function AdminCustomersPage() {
           <h1 className="text-3xl font-serif font-bold">Manage Customers</h1>
           <p className="text-muted-foreground">View customer profiles from Firestore.</p>
         </div>
-         <Button disabled> {/* This functionality would require more complex user management roles */}
+         <Button disabled> 
             <Users className="mr-2 h-5 w-5" /> Add New Customer (Coming Soon)
         </Button>
       </div>
@@ -30,12 +72,15 @@ export default async function AdminCustomersPage() {
             Customer List ({customers.length})
           </CardTitle>
           <CardDescription>
-            A list of registered users who have signed up. 
-            Extended profile information (like order history) would require further integration.
+             {error ? (
+                <span className="text-destructive flex items-center"><AlertTriangle className="mr-2 h-4 w-4" />{error}</span>
+            ) : (
+               "A list of registered users. New users appear here after signup."
+            )}
           </CardDescription>
         </CardHeader>
         <CardContent>
-           {customers.length > 0 ? (
+           {!error && customers.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -43,7 +88,6 @@ export default async function AdminCustomersPage() {
                   <TableHead>Email</TableHead>
                   <TableHead className="hidden md:table-cell">Display Name</TableHead>
                   <TableHead className="hidden lg:table-cell">Joined</TableHead>
-                  {/* <TableHead className="text-center hidden sm:table-cell">Orders</TableHead> */}
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -63,11 +107,10 @@ export default async function AdminCustomersPage() {
                     <TableCell className="hidden lg:table-cell">
                       {customer.createdAt ? format(new Date(customer.createdAt), 'PPP') : 'N/A'}
                     </TableCell>
-                    {/* <TableCell className="text-center hidden sm:table-cell">0</TableCell> */}
                     <TableCell className="text-right">
                        <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" disabled> {/* Actions disabled for now */}
+                          <Button variant="ghost" size="icon" disabled> 
                             <MoreVertical className="h-4 w-4" />
                              <span className="sr-only">Customer Actions</span>
                           </Button>
@@ -84,15 +127,13 @@ export default async function AdminCustomersPage() {
               </TableBody>
             </Table>
           ) : (
+            !error && (
              <div className="text-center py-12 text-muted-foreground">
                 <Users className="h-16 w-16 mx-auto mb-4 opacity-50" />
                 <p className="text-lg">No customers found.</p>
-                <p className="flex items-center justify-center text-amber-600">
-                  <AlertTriangle className="mr-2 h-5 w-5" /> 
-                  Ensure Firestore security rules allow 'list' access to the 'users' collection.
-                </p>
                 <p>New users will appear here after they sign up.</p>
             </div>
+            )
           )}
         </CardContent>
       </Card>

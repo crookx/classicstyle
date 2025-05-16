@@ -1,13 +1,13 @@
 
 'use client';
 import { useState, useEffect } from 'react';
-import { useForm, FormProvider } from 'react-hook-form'; // Ensured FormProvider is available if Form is an alias
+import { FormProvider, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
-  Form as ShadcnForm, // Renamed to avoid conflict if FormProvider is also used as Form
+  Form as ShadcnForm,
   FormControl,
   FormField,
   FormItem,
@@ -54,8 +54,10 @@ const signupSchema = z
 type LoginFormValues = z.infer<typeof loginSchema>;
 type SignupFormValues = z.infer<typeof signupSchema>;
 
+const RHFForm = FormProvider; // Alias for react-hook-form's FormProvider
+
 export default function LoginPage() {
-  const { login, signup, currentUser, loading: authLoading } = useAuth();
+  const { login, signup, currentUser, isAdmin, loading: authLoading, refreshAuthToken } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -64,33 +66,31 @@ export default function LoginPage() {
   const [isLoginView, setIsLoginView] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
-  const loginForm = useForm<LoginFormValues>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: { email: '', password: '' },
-  });
-
-  const signupForm = useForm<SignupFormValues>({
-    resolver: zodResolver(signupSchema),
-    defaultValues: { email: '', password: '', confirmPassword: '' },
-  });
 
   useEffect(() => {
-    if (!authLoading && currentUser) {
-      router.push(redirectPath);
+    if (!authLoading && currentUser && isAdmin !== null) { // Wait for isAdmin to be determined
+      setIsRedirecting(true);
+      if (isAdmin) {
+        router.push(redirectPath.startsWith('/admin') ? redirectPath : '/admin');
+      } else {
+        router.push(redirectPath === '/admin' ? '/' : redirectPath); // Avoid redirecting non-admin to /admin
+      }
     }
-  }, [currentUser, authLoading, router, redirectPath]);
+  }, [currentUser, isAdmin, authLoading, router, redirectPath]);
 
   async function onLoginSubmit(values: LoginFormValues) {
     setAuthError(null);
     setIsSubmitting(true);
     try {
       await login(values.email, values.password);
+      // refreshAuthToken will be called by AuthContext, then useEffect will handle redirection
       toast({
         title: 'Login Successful!',
-        description: 'Welcome back.',
+        description: 'Welcome back. Redirecting...',
       });
-      // Redirect is handled by useEffect
+      // Redirection is handled by useEffect
     } catch (error: any) {
       handleAuthError(error, 'Login Failed');
     } finally {
@@ -146,37 +146,41 @@ export default function LoginPage() {
     setAuthError(message);
   };
 
+  const loginForm = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { email: '', password: '' },
+  });
+
+  const signupForm = useForm<SignupFormValues>({
+    resolver: zodResolver(signupSchema),
+    defaultValues: { email: '', password: '', confirmPassword: '' },
+  });
+
   const toggleView = () => {
     setIsLoginView(!isLoginView);
     setAuthError(null);
-    // Reset forms to their default values and clear errors
     loginForm.reset({ email: '', password: '' }, { keepValues: false, keepDirty: false, keepErrors: false, keepTouched: false, keepIsValid: false });
     signupForm.reset({ email: '', password: '', confirmPassword: '' }, { keepValues: false, keepDirty: false, keepErrors: false, keepTouched: false, keepIsValid: false });
     setIsSubmitting(false);
   };
-  
-  if (authLoading && !currentUser) {
+
+  if (authLoading || isRedirecting) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
         <p className="text-lg text-muted-foreground">
-          Loading authentication...
+          {isRedirecting ? 'Redirecting...' : 'Loading authentication...'}
         </p>
       </div>
     );
   }
-
-  if (!authLoading && currentUser) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
-        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-        <p className="text-lg text-muted-foreground">Redirecting...</p>
-      </div>
-    );
+  
+  // Avoid rendering form if already logged in and about to redirect (covered by above)
+  if (!authLoading && currentUser && !isRedirecting) {
+     setIsRedirecting(true); // Trigger redirect state
+     return null; // or the loading spinner again
   }
 
-  // Using ShadcnForm as Form from react-hook-form is FormProvider
-  const RHFForm = FormProvider; 
 
   return (
     <div className="flex items-center justify-center py-12 px-4">
@@ -195,7 +199,7 @@ export default function LoginPage() {
           {isLoginView ? (
             <RHFForm {...loginForm} >
               <form
-                key="login-html-form" // Added key to HTML form
+                key="login-html-form"
                 onSubmit={loginForm.handleSubmit(onLoginSubmit)}
                 className="space-y-6"
               >
@@ -251,7 +255,7 @@ export default function LoginPage() {
           ) : (
             <RHFForm {...signupForm}>
               <form
-                key="signup-html-form" // Added key to HTML form
+                key="signup-html-form"
                 onSubmit={signupForm.handleSubmit(onSignupSubmit)}
                 className="space-y-6"
               >

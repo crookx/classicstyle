@@ -5,7 +5,6 @@ import { type ReactNode, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
 import { SiteLogo } from '@/components/layout/SiteLogo';
 import { Input } from '@/components/ui/input';
 import {
@@ -19,6 +18,7 @@ import {
   BarChart3,
   Settings,
   Search,
+  ShieldAlert, // For unauthorized message
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -37,23 +37,38 @@ import {
 const navItems = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/products', label: 'Products', icon: Package },
-  { href: '/admin/orders', label: 'Orders', icon: ShoppingCart }, 
-  { href: '/admin/customers', label: 'Customers', icon: Users }, 
-  { href: '/admin/analytics', label: 'Analytics', icon: BarChart3 }, 
-  { href: '/admin/settings', label: 'Settings', icon: Settings }, 
+  { href: '/admin/orders', label: 'Orders', icon: ShoppingCart },
+  { href: '/admin/customers', label: 'Customers', icon: Users },
+  { href: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
+  { href: '/admin/settings', label: 'Settings', icon: Settings },
 ];
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
-  const { currentUser, loading, logout } = useAuth();
+  const { currentUser, isAdmin, loading, logout, refreshAuthToken } = useAuth();
   const router = useRouter();
-  const pathname = usePathname(); 
+  const pathname = usePathname();
   const { toast } = useToast();
 
   useEffect(() => {
-    if (!loading && !currentUser) {
-      router.push(`/login?redirect=${pathname}`); 
+    if (!loading && currentUser) {
+      // Manually refresh token to ensure claims are up-to-date after login
+      // This helps if claims were set just before login
+      refreshAuthToken();
     }
-  }, [currentUser, loading, router, pathname]);
+  }, [currentUser, loading, refreshAuthToken]);
+
+
+  useEffect(() => {
+    if (!loading) {
+      if (!currentUser) {
+        router.push(`/login?redirect=${pathname}`);
+      } else if (isAdmin === false) { // Explicitly check for false after loading isAdmin status
+        // Don't redirect if isAdmin is null (still loading claims)
+        // Only redirect if definitely not an admin
+      }
+    }
+  }, [currentUser, isAdmin, loading, router, pathname]);
+
 
   const handleLogout = async () => {
     try {
@@ -65,21 +80,42 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     }
   };
 
-  if (loading) {
+  if (loading || isAdmin === null) { // Also wait for isAdmin to be determined
     return (
       <div className="flex items-center justify-center h-screen bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="ml-4 text-lg">Loading admin panel...</p>
       </div>
     );
   }
 
   if (!currentUser) {
+     // This case should be caught by the useEffect, but as a fallback:
     return (
       <div className="flex items-center justify-center h-screen bg-background">
         <p className="text-muted-foreground">Redirecting to login...</p>
       </div>
     );
   }
+  
+  if (isAdmin === false) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen bg-background p-6 text-center">
+        <ShieldAlert className="h-16 w-16 text-destructive mb-6" />
+        <h1 className="text-3xl font-serif font-bold mb-4">Access Denied</h1>
+        <p className="text-lg text-muted-foreground mb-6">
+          You do not have permission to access the admin panel.
+        </p>
+        <div className="space-x-4">
+          <Link href="/" passHref>
+            <Button variant="outline">Go to Homepage</Button>
+          </Link>
+          <Button onClick={handleLogout} variant="destructive">Logout</Button>
+        </div>
+      </div>
+    );
+  }
+
 
   return (
     <SidebarProvider defaultOpen>
@@ -96,11 +132,10 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               <SidebarMenuItem key={item.label}>
                 <SidebarMenuButton
                   asChild
-                  isActive={pathname === item.href || (item.href !== '/admin' && pathname.startsWith(item.href))} // More robust active check
+                  isActive={pathname === item.href || (item.href !== '/admin' && pathname.startsWith(item.href))}
                   tooltip={item.label}
-                  className={item.disabled ? "cursor-not-allowed opacity-50" : ""}
                 >
-                  <Link href={item.disabled ? "#" : item.href}>
+                  <Link href={item.href}>
                     <item.icon />
                     <span>{item.label}</span>
                   </Link>
@@ -131,7 +166,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
       <SidebarInset>
         <header className="sticky top-0 z-40 flex h-14 items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-6 shadow-sm">
-          <div className="md:hidden"> 
+          <div className="md:hidden">
              <SidebarTrigger />
           </div>
           <div className="relative flex-1">
@@ -140,10 +175,9 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               type="search"
               placeholder="Search products, orders, customers..."
               className="w-full rounded-lg bg-muted pl-8 md:w-[300px] lg:w-[400px] h-9 shadow-none"
-              disabled // Placeholder search
+              disabled
             />
           </div>
-          {/* Potentially add user avatar or other quick actions here */}
         </header>
         <main className="flex-1 p-6 md:p-8 overflow-auto">
           {children}
