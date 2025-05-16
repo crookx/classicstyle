@@ -1,3 +1,4 @@
+
 // /app/api/stripe-webhooks/route.ts
 import {NextRequest, NextResponse} from 'next/server';
 import Stripe from 'stripe';
@@ -6,30 +7,50 @@ import {getFirestore, FieldValue} from 'firebase-admin/firestore';
 
 // --- Firebase Admin Initialization ---
 let serviceAccount: ServiceAccount;
-try {
-  const base64ServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_KEY_JSON;
-  if (!base64ServiceAccount) {
-    throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY_JSON environment variable is not set or is empty.');
-  }
-  const decodedServiceAccountJson = Buffer.from(base64ServiceAccount, 'base64').toString('utf-8');
-  serviceAccount = JSON.parse(decodedServiceAccountJson);
-} catch (e: any) {
-  console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY_JSON:", e.message);
-  // @ts-ignore
-  serviceAccount = {}; 
-}
+let db: FirebaseFirestore.Firestore;
+let adminAppInitialized = false;
 
-if (!getApps().length) {
-  try {
+try {
+  if (!getApps().length) {
+    const base64ServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_KEY_JSON;
+    if (!base64ServiceAccount) {
+      throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY_JSON environment variable is not set or is empty.');
+    }
+
+    let decodedServiceAccountJson: string;
+    try {
+      decodedServiceAccountJson = Buffer.from(base64ServiceAccount, 'base64').toString('utf-8');
+    } catch (e: any) {
+      console.error("Failed to decode Base64 service account key:", e.message);
+      throw new Error('Failed to decode FIREBASE_SERVICE_ACCOUNT_KEY_JSON. Ensure it is a valid Base64 string.');
+    }
+
+    try {
+      serviceAccount = JSON.parse(decodedServiceAccountJson);
+    } catch (e: any) {
+      console.error("Failed to parse service account JSON:", e.message);
+      throw new Error('Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY_JSON. Ensure it is valid JSON.');
+    }
+
+    if (!serviceAccount || typeof serviceAccount.project_id !== 'string' || !serviceAccount.project_id) {
+        console.error("Parsed service account is missing 'project_id' or it's not a string. Service Account content:", JSON.stringify(serviceAccount).substring(0, 200) + "..."); // Log first 200 chars
+        throw new Error('Service account object must contain a string "project_id" property.');
+    }
+
     initializeApp({
       credential: cert(serviceAccount),
     });
     console.log("Firebase Admin SDK initialized successfully for Vercel function.");
-  } catch (e: any) {
-     console.error("Firebase Admin SDK initialization error in Vercel function:", e.message);
+    adminAppInitialized = true;
+  } else {
+    console.log("Firebase Admin SDK already initialized for Vercel function.");
+    adminAppInitialized = true; // Already initialized
   }
+  db = getFirestore();
+} catch (e: any) {
+  console.error("CRITICAL: Firebase Admin SDK initialization error in Vercel function:", e.message, e.stack);
+  // serviceAccount remains undefined or partially defined, db remains undefined
 }
-const db = getFirestore();
 // --- End Firebase Admin Initialization ---
 
 // --- Stripe Initialization ---
@@ -43,14 +64,18 @@ if (!webhookSecret) {
   console.error("Stripe webhook_secret (STRIPE_WEBHOOK_SECRET_VERCEL) is not set for Vercel environment variables.");
 }
 
-// @ts-ignore
+// @ts-ignore Stripe constructor can accept undefined but will throw error on API calls if key is missing
 const stripe = new Stripe(stripeSecretKey, {
-  apiVersion: "2023-10-16", 
+  apiVersion: "2024-06-20", 
   typescript: true,
 });
 // --- End Stripe Initialization ---
 
 export async function POST(request: NextRequest) {
+  if (!adminAppInitialized || !db) {
+    console.error("Webhook Error: Firebase Admin SDK not initialized. Cannot process event.");
+    return NextResponse.json({error: "Webhook server error: Firebase Admin not available."}, {status: 500});
+  }
   if (!webhookSecret) {
     console.error("Webhook Error: Webhook signing secret not configured on Vercel.");
     return NextResponse.json({error: "Webhook server error: Signing secret missing."}, {status: 500});
@@ -101,9 +126,6 @@ export async function POST(request: NextRequest) {
           console.warn(
             `No order found with paymentIntentId: ${paymentIntent.id} on Vercel. This might happen if client-side order creation failed or was delayed.`,
           );
-          // Optional: Create order here if it's missing and you have enough info from paymentIntent.
-          // This would make it more robust if client-side creation fails.
-          // For now, we log and proceed.
         } else {
           const batch = db.batch();
           querySnapshot.forEach((doc) => {
@@ -156,16 +178,13 @@ export async function POST(request: NextRequest) {
     }
   } catch (error: any) {
       console.error(
-        `Error processing event ${event.type} for PI ${('paymentIntent' in event.data.object && event.data.object.paymentIntent) || event.id} on Vercel:`,
+        `Error processing event ${event.type} for PI ${('paymentIntent' in event.data.object && (event.data.object as Stripe.PaymentIntent).id) || event.id} on Vercel:`,
         error.message,
         error.stack
       );
-      // Return 500 to Stripe so it retries (if applicable for the error)
       return NextResponse.json({error: 'Internal server error processing webhook event.'}, {status: 500});
   }
 
   return NextResponse.json({received: true});
 }
-
-// Optional: Edge runtime configuration if preferred, though Node.js is fine.
-// export const runtime = 'edge';
+    
