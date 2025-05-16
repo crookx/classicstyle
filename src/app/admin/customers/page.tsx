@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Users, MoreVertical, Mail, ShoppingBag, UserCircle, AlertTriangle, Loader2, PlusCircle } from "lucide-react";
+import { Users, MoreVertical, Mail, ShoppingBag, UserCircle, AlertTriangle, Loader2, PlusCircle, Eye } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -14,7 +14,7 @@ import { format } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useToast } from '@/hooks/use-toast'; // Import useToast
+import { useToast } from '@/hooks/use-toast';
 
 export default function AdminCustomersPage() {
   const [customers, setCustomers] = useState<UserProfile[]>([]);
@@ -22,11 +22,11 @@ export default function AdminCustomersPage() {
   const [error, setError] = useState<string | null>(null);
   const { currentUser, isAdmin, loading: authLoading } = useAuth();
   const router = useRouter();
-  const { toast } = useToast(); // Initialize toast
+  const { toast } = useToast();
 
   useEffect(() => {
     if (!authLoading) {
-      if (!currentUser || isAdmin === false) {
+      if (!currentUser || isAdmin === false) { // Ensure isAdmin is checked
         router.push('/login?redirect=/admin/customers');
         return;
       }
@@ -49,10 +49,11 @@ export default function AdminCustomersPage() {
     }
   }, [currentUser, isAdmin, authLoading, router]);
 
-  const handleCustomerAction = (action: string, customerName: string) => {
+  const handleSendEmail = (customerEmail: string) => {
+    window.location.href = `mailto:${customerEmail}`;
     toast({
-      title: 'Action Clicked',
-      description: `${action} for ${customerName} (Not yet implemented).`,
+      title: 'Opening Email Client',
+      description: `Preparing to send email to ${customerEmail}.`,
     });
   };
 
@@ -74,7 +75,7 @@ export default function AdminCustomersPage() {
         </div>
          <Link href="/admin/customers/new">
             <Button> 
-                <PlusCircle className="mr-2 h-5 w-5" /> Add New Customer
+                <PlusCircle className="mr-2 h-5 w-5" /> Add New Customer Record
             </Button>
         </Link>
       </div>
@@ -88,7 +89,7 @@ export default function AdminCustomersPage() {
              {error ? (
                 <span className="text-destructive flex items-center"><AlertTriangle className="mr-2 h-4 w-4" />{error}</span>
             ) : (
-               "A list of registered users. New users appear here after signup."
+               "A list of registered users. New users appear here after signup and admins can add customer records."
             )}
           </CardDescription>
         </CardHeader>
@@ -116,7 +117,7 @@ export default function AdminCustomersPage() {
                       </Avatar>
                     </TableCell>
                     <TableCell className="font-medium">{customer.email}</TableCell>
-                    <TableCell className="hidden md:table-cell">{customer.displayName || 'N/A'}</TableCell>
+                    <TableCell className="hidden md:table-cell">{customer.displayName || customer.firstName || 'N/A'}</TableCell>
                     <TableCell className="hidden lg:table-cell">
                       {customer.createdAt ? format(new Date(customer.createdAt), 'PPP') : 'N/A'}
                     </TableCell>
@@ -129,13 +130,12 @@ export default function AdminCustomersPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleCustomerAction('View Profile', customer.displayName || customer.email)}>
-                            <UserCircle className="mr-2 h-4 w-4"/>View Profile
+                          <DropdownMenuItem asChild>
+                            <Link href={`/admin/customers/${customer.id}`}>
+                                <Eye className="mr-2 h-4 w-4"/>View Profile & Orders
+                            </Link>
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleCustomerAction('View Orders', customer.displayName || customer.email)}>
-                            <ShoppingBag className="mr-2 h-4 w-4"/>View Orders
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleCustomerAction('Send Email', customer.displayName || customer.email)}>
+                          <DropdownMenuItem onClick={() => handleSendEmail(customer.email)}>
                             <Mail className="mr-2 h-4 w-4"/>Send Email
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -150,7 +150,7 @@ export default function AdminCustomersPage() {
              <div className="text-center py-12 text-muted-foreground">
                 <Users className="h-16 w-16 mx-auto mb-4 opacity-50" />
                 <p className="text-lg">No customers found.</p>
-                <p>New users will appear here after they sign up.</p>
+                <p>New users will appear here after they sign up, or add a customer record manually.</p>
                 <p className="mt-2 text-sm">If you have recently added users, ensure your Firestore permissions allow listing for admins.</p>
             </div>
             )

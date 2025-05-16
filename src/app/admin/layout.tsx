@@ -62,7 +62,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       if (!currentUser) {
         router.push(`/login?redirect=${pathname}`);
       } else if (isAdmin === false) { 
-        // Only redirect if definitely not an admin
+        // Further check done below if isAdmin becomes false after loading
       }
     }
   }, [currentUser, isAdmin, loading, router, pathname]);
@@ -119,7 +119,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       <Sidebar collapsible="icon" className="border-r border-border/70">
         <SidebarHeader className="p-4 border-b border-border/70">
           <div className="flex items-center gap-2">
-            <SiteLogo /> {/* Use SiteLogo component */}
+            <SiteLogo /> 
             <span className="font-semibold text-lg group-data-[collapsible=icon]:hidden">Admin</span>
           </div>
         </SidebarHeader>

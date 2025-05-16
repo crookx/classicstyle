@@ -22,6 +22,8 @@ export interface Product {
   tags?: string[] | null;
   sku?: string | null;
   isFeatured?: boolean | null;
+  createdAt?: any; // Firestore Timestamp
+  updatedAt?: any; // Firestore Timestamp
 }
 
 export interface Collection {
@@ -32,6 +34,8 @@ export interface Collection {
   imageUrl: string;
   dataAiHint?: string | null;
   productIds: string[];
+  createdAt?: any; 
+  updatedAt?: any; 
 }
 
 export interface OrderItem {
@@ -59,16 +63,18 @@ export interface Order {
     postalCode: string;
     country: string;
   } | null;
-  // Timestamps for better tracking
-  createdAt?: any; // Firebase Timestamp type
-  updatedAt?: any; // Firebase Timestamp type
+  createdAt?: any; 
+  updatedAt?: any; 
 }
 
 export interface UserProfile {
-  id: string; // Corresponds to Firebase Auth UID
+  id: string; // Corresponds to Firebase Auth UID or manually created ID
   email: string;
   displayName?: string | null;
   photoURL?: string | null;
   createdAt: any; // Firestore Timestamp
   // Add other profile fields as needed, e.g., role, address, phone
+  firstName?: string | null;
+  lastName?: string | null;
+  phone?: string | null;
 }

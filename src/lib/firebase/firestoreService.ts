@@ -17,7 +17,7 @@ import {
   serverTimestamp,
   documentId,
   getCountFromServer,
-  setDoc // For setting a document with a specific ID (e.g., user profiles)
+  setDoc 
 } from 'firebase/firestore';
 
 const PRODUCTS_COLLECTION = 'products';
@@ -32,8 +32,8 @@ const fromFirestore = <T extends { id: string }>(docSnap: ReturnType<typeof getD
   }
   const data = docSnap.data();
   
-  // Convert known Firestore Timestamps to JS Date objects or ISO strings
   const convertTimestamps = (obj: any) => {
+    if (!obj) return;
     for (const key in obj) {
       if (obj[key] instanceof Timestamp) {
         obj[key] = obj[key].toDate().toISOString(); 
@@ -194,7 +194,7 @@ export async function getCollectionBySlug(slug: string): Promise<Collection | nu
 
 export async function addProduct(productData: Omit<Product, 'id' | 'rating' | 'reviewCount'>): Promise<Product | null> {
   const collectionPath = PRODUCTS_COLLECTION;
-  console.log(`[FirestoreService] addProduct: Attempting to write to collection: '${collectionPath}'.`);
+  console.log(`[FirestoreService] addProduct: Attempting to write to collection: '${collectionPath}'. Data:`, productData);
   try {
     const dataWithTimestamp = {
       ...productData,
@@ -202,9 +202,7 @@ export async function addProduct(productData: Omit<Product, 'id' | 'rating' | 'r
       updatedAt: serverTimestamp(),
     };
     const docRef = await addDoc(collection(db, collectionPath), dataWithTimestamp);
-    // For the return, we can't immediately get server-generated timestamps without another read.
-    // So, we return the input data + ID, and assume timestamps are handled by Firestore.
-    return { id: docRef.id, ...productData } as Product; 
+    return { id: docRef.id, ...productData, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as Product; 
   } catch (error) {
     console.error(`[FirestoreService] addProduct: Error adding product to Firestore collection '${collectionPath}':`, error);
     return null;
@@ -213,7 +211,7 @@ export async function addProduct(productData: Omit<Product, 'id' | 'rating' | 'r
 
 export async function updateProduct(productId: string, productData: Partial<Omit<Product, 'id'>>): Promise<boolean> {
   const docPath = `${PRODUCTS_COLLECTION}/${productId}`;
-  console.log(`[FirestoreService] updateProduct: Attempting to update document: '${docPath}'.`);
+  console.log(`[FirestoreService] updateProduct: Attempting to update document: '${docPath}'. Data:`, productData);
   try {
     const docRef = doc(db, PRODUCTS_COLLECTION, productId);
     await updateDoc(docRef, { ...productData, updatedAt: serverTimestamp() });
@@ -264,12 +262,27 @@ export async function getOrderById(orderId: string): Promise<Order | null> {
   }
 }
 
+export async function getOrdersByUserId(userId: string): Promise<Order[]> {
+  const collectionPath = ORDERS_COLLECTION;
+  console.log(`[FirestoreService] getOrdersByUserId: Attempting to read from collection: '${collectionPath}' for userId: ${userId}.`);
+  try {
+    const ordersRef = collection(db, collectionPath);
+    const q = query(ordersRef, where('userId', '==', userId));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(docSnap => fromFirestore<Order>(docSnap)).filter(o => o !== null) as Order[];
+  } catch (error) {
+    console.error(`[FirestoreService] getOrdersByUserId: Error fetching orders for user ${userId} from '${collectionPath}':`, error);
+    return [];
+  }
+}
+
 export async function updateOrderStatus(orderId: string, status: OrderStatus): Promise<boolean> {
   const docPath = `${ORDERS_COLLECTION}/${orderId}`;
-  console.log(`[FirestoreService] updateOrderStatus: Attempting to update status for order: '${docPath}'.`);
+  console.log(`[FirestoreService] updateOrderStatus: Attempting to update status for order: '${docPath}' to '${status}'.`);
   try {
     const docRef = doc(db, ORDERS_COLLECTION, orderId);
     await updateDoc(docRef, { status: status, updatedAt: serverTimestamp() });
+    console.log(`[FirestoreService] updateOrderStatus: Successfully updated status for order ${orderId}.`);
     return true;
   } catch (error) {
     console.error(`[FirestoreService] updateOrderStatus: Error updating status for order ${orderId} in '${docPath}':`, error);
@@ -279,26 +292,45 @@ export async function updateOrderStatus(orderId: string, status: OrderStatus): P
 
 export async function addUserProfile(uid: string, email: string, displayName?: string | null): Promise<boolean> {
   const docPath = `${USERS_COLLECTION}/${uid}`;
-  console.log(`[FirestoreService] addUserProfile: Attempting to create user profile: '${docPath}'.`);
+  console.log(`[FirestoreService] addUserProfile (auth context): Creating user profile: '${docPath}' for new auth user.`);
   try {
-    // Firestore Timestamps are preferred for consistency, ensuring server-side times
     const userProfileData: Omit<UserProfile, 'id'> = {
       email: email,
       displayName: displayName || null,
-      createdAt: serverTimestamp(), // Use server timestamp for creation
-      // photoURL could be added if available from auth user or set later
+      createdAt: serverTimestamp(),
     };
     await setDoc(doc(db, USERS_COLLECTION, uid), userProfileData);
     return true;
   } catch (error) {
-    console.error(`[FirestoreService] addUserProfile: Error creating user profile for UID ${uid} in '${docPath}':`, error);
+    console.error(`[FirestoreService] addUserProfile (auth context): Error creating user profile for UID ${uid} in '${docPath}':`, error);
     return false;
   }
 }
 
+export async function addUserProfileByAdmin(profileData: Omit<UserProfile, 'id' | 'createdAt' | 'photoURL'>): Promise<UserProfile | null> {
+  const collectionPath = USERS_COLLECTION;
+  console.log(`[FirestoreService] addUserProfileByAdmin: Attempting to create user profile by admin:`, profileData);
+  try {
+    // Note: This does NOT create a Firebase Auth user. It only creates a profile document.
+    // If an ID is not provided, Firestore will auto-generate one.
+    // However, it's better if the admin form generates a unique ID or if this is linked to an auth UID later.
+    // For simplicity, let's auto-generate for now if not provided.
+    const dataWithTimestamp = {
+      ...profileData,
+      createdAt: serverTimestamp(),
+    };
+    const docRef = await addDoc(collection(db, collectionPath), dataWithTimestamp);
+    return { id: docRef.id, ...profileData, createdAt: new Date().toISOString() } as UserProfile;
+  } catch (error) {
+    console.error(`[FirestoreService] addUserProfileByAdmin: Error adding user profile to Firestore collection '${collectionPath}':`, error);
+    return null;
+  }
+}
+
+
 export async function getUsers(count?: number): Promise<UserProfile[]> {
   const collectionPath = USERS_COLLECTION;
-  console.log(`[FirestoreService] getUsers: Attempting to read from collection: '${collectionPath}' (user performing this action needs 'list' permission on this collection).`);
+  console.log(`[FirestoreService] getUsers: Attempting to read from collection: '${collectionPath}'.`);
   try {
     const usersRef = collection(db, collectionPath);
     const q = count ? query(usersRef, limit(count)) : usersRef;
@@ -307,7 +339,20 @@ export async function getUsers(count?: number): Promise<UserProfile[]> {
     console.log(`[FirestoreService] getUsers: Successfully fetched ${users.length} user(s) from '${collectionPath}'.`);
     return users;
   } catch (error) {
-    console.error(`[FirestoreService] getUsers: Error fetching users from '${collectionPath}'. This often indicates a Firestore security rule issue (missing 'list' permission). Error details:`, error);
+    console.error(`[FirestoreService] getUsers: Error fetching users from '${collectionPath}'. Check Firestore permissions. Error details:`, error);
     return [];
+  }
+}
+
+export async function getUserById(userId: string): Promise<UserProfile | null> {
+  const docPath = `${USERS_COLLECTION}/${userId}`;
+  console.log(`[FirestoreService] getUserById: Attempting to read document: '${docPath}'.`);
+  try {
+    const docRef = doc(db, USERS_COLLECTION, userId);
+    const docSnap = await getDoc(docRef);
+    return fromFirestore<UserProfile>(docSnap);
+  } catch (error) {
+    console.error(`[FirestoreService] getUserById: Error fetching user with ID ${userId} from '${docPath}':`, error);
+    return null;
   }
 }
