@@ -278,14 +278,21 @@ export async function getOrdersByUserId(userId: string): Promise<Order[]> {
 
 export async function updateOrderStatus(orderId: string, status: OrderStatus): Promise<boolean> {
   const docPath = `${ORDERS_COLLECTION}/${orderId}`;
-  console.log(`[FirestoreService] updateOrderStatus: Attempting to update status for order: '${docPath}' to '${status}'.`);
+  const dataToUpdate = { status: status, updatedAt: serverTimestamp() };
+  console.log(`[FirestoreService] updateOrderStatus: Attempting to update status for order: '${docPath}' to '${status}'. Data:`, dataToUpdate);
   try {
     const docRef = doc(db, ORDERS_COLLECTION, orderId);
-    await updateDoc(docRef, { status: status, updatedAt: serverTimestamp() });
+    await updateDoc(docRef, dataToUpdate);
     console.log(`[FirestoreService] updateOrderStatus: Successfully updated status for order ${orderId}.`);
     return true;
-  } catch (error) {
-    console.error(`[FirestoreService] updateOrderStatus: Firebase error updating status for order ${orderId} in '${docPath}':`, error); // More specific logging
+  } catch (error: any) { // Catch specific Firebase errors or general errors
+    console.error(`[FirestoreService] updateOrderStatus: Firebase error updating status for order ${orderId} in '${docPath}'.`);
+    if (error.code) { // Firebase specific error
+      console.error(`Firebase Error Code: ${error.code}, Message: ${error.message}`);
+    } else { // General JavaScript error
+      console.error(`General Error: ${error.message}`, error);
+    }
+    console.error("Full error object:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
     return false;
   }
 }
@@ -316,7 +323,9 @@ export async function addUserProfileByAdmin(profileData: Omit<UserProfile, 'id' 
       createdAt: serverTimestamp(),
     };
     const docRef = await addDoc(collection(db, collectionPath), dataWithTimestamp);
-    return { id: docRef.id, ...profileData, createdAt: new Date().toISOString() } as UserProfile;
+    // Fetch the created doc to get the auto-generated ID and server-generated timestamp correctly
+    const newDocSnap = await getDoc(docRef);
+    return fromFirestore<UserProfile>(newDocSnap);
   } catch (error) {
     console.error(`[FirestoreService] addUserProfileByAdmin: Error adding user profile to Firestore collection '${collectionPath}':`, error);
     return null;
@@ -352,3 +361,5 @@ export async function getUserById(userId: string): Promise<UserProfile | null> {
     return null;
   }
 }
+
+    
