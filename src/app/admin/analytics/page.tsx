@@ -1,10 +1,16 @@
 
+'use client'; // Add this directive
+
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { BarChart3, DollarSign, Users, ShoppingCart, TrendingUp, AlertTriangle } from "lucide-react";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Pie, PieChart, Cell } from "recharts";
+import { useEffect, useState } from "react"; // Import useEffect and useState
 
-const mockSalesData = [
+// Keep mockSalesData generation here. It will run once when the client module loads.
+// For more complex scenarios or to avoid potential hydration issues if this data were truly dynamic
+// based on client-side state before initial render, consider moving generation into useEffect.
+const generateMockSalesData = () => [
   { month: "Jan", sales: Math.floor(Math.random() * 3000) + 1000 },
   { month: "Feb", sales: Math.floor(Math.random() * 3000) + 1000 },
   { month: "Mar", sales: Math.floor(Math.random() * 3000) + 1000 },
@@ -26,6 +32,27 @@ const chartConfig = {
 };
 
 export default function AdminAnalyticsPage() {
+  const [salesData, setSalesData] = useState<Array<{month: string; sales: number}>>([]);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    // Ensure this runs only on the client after hydration
+    setSalesData(generateMockSalesData());
+    setIsClient(true); // Indicate that component has mounted on client
+  }, []);
+
+  if (!isClient) {
+    // Optional: Render a loading state or null until client-side mount to avoid hydration issues with charts
+    return (
+      <div className="space-y-8">
+        <div>
+          <h1 className="text-3xl font-serif font-bold">Store Analytics</h1>
+          <p className="text-muted-foreground">Loading analytics data...</p>
+        </div>
+      </div>
+    ); 
+  }
+
   return (
     <div className="space-y-8">
       <div>
@@ -90,7 +117,7 @@ export default function AdminAnalyticsPage() {
           <CardContent>
             <ChartContainer config={chartConfig} className="h-[300px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={mockSalesData} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
+                <BarChart data={salesData} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} />
                   <YAxis tickLine={false} axisLine={false} tickMargin={8} />
