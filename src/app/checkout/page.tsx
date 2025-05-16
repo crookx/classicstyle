@@ -13,9 +13,9 @@ import { useCart } from '@/contexts/CartContext';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/contexts/AuthContext'; // Added
-import { useRouter } from 'next/navigation'; // Added
-import { useEffect } from 'react'; // Added
+import { useAuth } from '@/contexts/AuthContext'; 
+import { useRouter } from 'next/navigation'; 
+import { useEffect } from 'react'; 
 import { Loader2 } from 'lucide-react';
 
 
@@ -44,19 +44,19 @@ const checkoutSchema = shippingSchema.merge(paymentSchema);
 export default function CheckoutPage() {
   const { cart, totalPrice, totalItems, clearCart } = useCart();
   const { toast } = useToast();
-  const { currentUser, loading: authLoading } = useAuth(); // Added
-  const router = useRouter(); // Added
+  const { currentUser, loading: authLoading } = useAuth(); 
+  const router = useRouter(); 
 
   const form = useForm<z.infer<typeof checkoutSchema>>({
     resolver: zodResolver(checkoutSchema),
     defaultValues: {
-      email: currentUser?.email || '', // Pre-fill email if user is logged in
+      email: currentUser?.email || '', 
       firstName: '',
       lastName: '',
       address: '',
       apartment: '',
       city: '',
-      country: 'United States', 
+      country: 'Kenya', // Default to Kenya
       postalCode: '',
       phone: '',
       cardNumber: '',
@@ -84,7 +84,7 @@ export default function CheckoutPage() {
       description: "Thank you for your purchase. Your order is being processed.",
     });
     clearCart();
-    router.push('/'); // Navigate to home after order confirmation (or a dedicated confirmation page)
+    router.push('/'); 
   }
   
   if (authLoading) {
@@ -98,7 +98,6 @@ export default function CheckoutPage() {
   }
 
   if (!currentUser) {
-    // This state should ideally be brief due to the redirect in useEffect
     return (
          <div className="py-12 text-center">
             <h1 className="text-xl font-bold">Redirecting to login...</h1>
@@ -181,19 +180,19 @@ export default function CheckoutPage() {
               {cart.map(item => (
                 <div key={item.id} className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2">
-                    <Image src={item.imageUrl} alt={item.name} width={40} height={50} className="rounded object-cover" />
+                    <Image src={item.imageUrl || 'https://placehold.co/40x50.png'} alt={item.name} width={40} height={50} className="rounded object-cover" />
                     <div>
                       <p className="font-medium line-clamp-1">{item.name}</p>
                       <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
                     </div>
                   </div>
-                  <p>${(item.price * item.quantity).toFixed(2)}</p>
+                  <p>KSh {(item.price * item.quantity).toFixed(2)}</p>
                 </div>
               ))}
               <Separator />
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Subtotal</span>
-                <span>${totalPrice.toFixed(2)}</span>
+                <span>KSh {totalPrice.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Shipping</span>
@@ -206,7 +205,7 @@ export default function CheckoutPage() {
               <Separator />
               <div className="flex justify-between font-bold text-lg">
                 <span>Total</span>
-                <span>${totalPrice.toFixed(2)}</span>
+                <span>KSh {totalPrice.toFixed(2)}</span>
               </div>
             </CardContent>
             <CardFooter className="p-0 pt-6">

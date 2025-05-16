@@ -7,24 +7,21 @@ export interface ProductColor {
 export interface Product {
   id: string; // Firestore document ID
   name: string;
-  price: number; // Representing KES value as USD for display consistency
-  originalPrice?: number | null; // Firestore prefers null over undefined for optional fields
+  price: number; 
+  originalPrice?: number | null;
   imageUrl: string;
   dataAiHint?: string | null;
-  category?: string | null; // e.g., Men's Fashion, Women's Fashion
-  subCategory?: string | null; // e.g., Polo shirts, Slim-fit chinos
+  category?: string | null;
+  subCategory?: string | null;
   description: string;
   rating?: number | null;
   reviewCount?: number | null;
-  details?: string[] | null; // Array of strings
-  colors?: ProductColor[] | null; // Array of objects
-  sizes?: string[] | null; // Array of strings
-  tags?: string[] | null; // e.g., featured, trending, slim-fit
+  details?: string[] | null;
+  colors?: ProductColor[] | null;
+  sizes?: string[] | null;
+  tags?: string[] | null;
   sku?: string | null;
   isFeatured?: boolean | null;
-  // Firebase Timestamps can be added here if needed:
-  // createdAt?: any; // Firebase Timestamp type
-  // updatedAt?: any; // Firebase Timestamp type
 }
 
 export interface Collection {
@@ -34,7 +31,33 @@ export interface Collection {
   description: string;
   imageUrl: string;
   dataAiHint?: string | null;
-  productIds: string[]; // Array of Product IDs
-  // createdAt?: any;
-  // updatedAt?: any;
+  productIds: string[];
+}
+
+// New Order Types
+export interface OrderItem {
+  productId: string;
+  name: string; // Product name at the time of order
+  quantity: number;
+  price: number; // Price per unit at the time of order
+  imageUrl?: string | null; // Optional image for quick view in order summary
+}
+
+export interface Order {
+  id: string; // Firestore document ID
+  customerName: string;
+  customerEmail: string;
+  orderDate: string; // Consider using Firestore Timestamp for real apps for better querying/sorting
+  totalAmount: number;
+  status: 'Pending' | 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled';
+  items: OrderItem[];
+  shippingAddress?: { // Optional, can be expanded
+    address: string;
+    city: string;
+    postalCode: string;
+    country: string;
+  } | null;
+  // Firebase Timestamps can be added here if needed:
+  // createdAt?: any; // Firebase Timestamp type
+  // updatedAt?: any; // Firebase Timestamp type
 }

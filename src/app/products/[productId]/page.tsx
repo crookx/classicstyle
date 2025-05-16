@@ -13,8 +13,8 @@ import {
 } from "@/components/ui/accordion";
 import { getProductById, getProductsByCategoryId } from '@/lib/firebase/firestoreService';
 import type { Product } from '@/types';
-import AddToCartButton from './AddToCartButton'; // Client component for cart interaction
-import WishlistToggleButton from './WishlistToggleButton'; // Client component for wishlist
+import AddToCartButton from './AddToCartButton'; 
+import WishlistToggleButton from './WishlistToggleButton'; 
 import { notFound } from 'next/navigation';
 
 interface ProductDetailPageProps {
@@ -26,7 +26,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
   const product = await getProductById(productId);
 
   if (!product) {
-    notFound(); // Or redirect to a 404 page
+    notFound(); 
   }
 
   const relatedProducts = product.category 
@@ -38,7 +38,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
       <div className="grid md:grid-cols-2 gap-8 lg:gap-12 mb-12">
         <div className="shadow-xl rounded-lg overflow-hidden">
           <Image
-            src={product.imageUrl}
+            src={product.imageUrl || 'https://placehold.co/800x1000.png'}
             alt={product.name}
             width={800}
             height={1000}
@@ -61,22 +61,20 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
           )}
 
           <p className="text-3xl font-semibold text-primary">
-            ${product.price.toFixed(2)}
+            KSh {product.price.toFixed(2)}
             {product.originalPrice && (
-              <span className="ml-3 text-xl text-muted-foreground line-through">${product.originalPrice.toFixed(2)}</span>
+              <span className="ml-3 text-xl text-muted-foreground line-through">KSh {product.originalPrice.toFixed(2)}</span>
             )}
           </p>
           
           <p className="text-base text-foreground/80 leading-relaxed">{product.description}</p>
 
-          {/* Color and Size selection would need to be client components if they affect state */}
-          {/* For now, displaying available colors/sizes if they exist */}
           {product.colors && product.colors.length > 0 && (
             <div>
               <h3 className="text-sm font-medium text-foreground mb-2">Available Colors:</h3>
               <div className="flex flex-wrap gap-2">
                 {product.colors.map(color => (
-                  <span key={color.name} className="p-1 px-2 text-xs border rounded-full" style={{ backgroundColor: color.hex, color: '#000' /* Adjust text color based on hex for contrast */ }}>
+                  <span key={color.name} className="p-1 px-2 text-xs border rounded-full" style={{ backgroundColor: color.hex, color: '#000' }}>
                     {color.name}
                   </span>
                 ))}
@@ -119,7 +117,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
             <AccordionItem value="item-2">
               <AccordionTrigger className="text-base font-medium">Shipping &amp; Returns</AccordionTrigger>
               <AccordionContent className="text-sm text-foreground/80 space-y-2">
-                <p><ShieldCheck className="inline-block mr-2 h-5 w-5 text-green-600" />Free shipping on orders over $100.</p>
+                <p><ShieldCheck className="inline-block mr-2 h-5 w-5 text-green-600" />Free shipping on orders over KSh 10,000.</p>
                 <p><CheckCircle className="inline-block mr-2 h-5 w-5 text-green-600" />Easy 30-day returns.</p>
                 <p>Read our full <a href="/shipping-returns" className="underline text-primary hover:opacity-80">shipping and returns policy</a>.</p>
               </AccordionContent>

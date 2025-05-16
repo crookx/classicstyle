@@ -1,16 +1,15 @@
 
-import type { Product, Collection } from '@/types';
+import type { Product, Collection, Order } from '@/types';
 
-// This file now serves as the source for populating Firestore.
-// Prices are KES values, but will be treated as USD in the app ($ symbol).
-// For example, KES 1500 becomes $15.00.
+// Prices are KES values.
+// Using a consistent number of decimal places for display (e.g., .00) is handled by toFixed(2) in UI.
 
 export const productsToUpload: Product[] = [
   // Men's Fashion - Tops
   {
     id: 'mens-polo-classic-001',
     name: "Men's Classic Pique Polo",
-    price: 12.00, // KES 1200
+    price: 1200,
     imageUrl: 'https://placehold.co/600x800.png',
     dataAiHint: 'mens polo shirt',
     category: "Men's Fashion",
@@ -25,7 +24,7 @@ export const productsToUpload: Product[] = [
   {
     id: 'mens-casual-buttondown-linen-002',
     name: "Men's Linen Casual Button-Down Shirt",
-    price: 18.00, // KES 1800
+    price: 1800,
     imageUrl: 'https://placehold.co/600x800.png',
     dataAiHint: 'mens linen shirt',
     category: "Men's Fashion",
@@ -40,7 +39,7 @@ export const productsToUpload: Product[] = [
   {
     id: 'mens-crewneck-sweatshirt-003',
     name: "Men's Basic Crew Neck Sweatshirt",
-    price: 15.00, // KES 1500
+    price: 1500,
     imageUrl: 'https://placehold.co/600x800.png',
     dataAiHint: 'mens sweatshirt',
     category: "Men's Fashion",
@@ -54,7 +53,7 @@ export const productsToUpload: Product[] = [
   {
     id: 'mens-cardigan-wool-004',
     name: "Men's Fine Wool Cardigan",
-    price: 25.00, // KES 2500
+    price: 2500,
     imageUrl: 'https://placehold.co/600x800.png',
     dataAiHint: 'mens cardigan',
     category: "Men's Fashion",
@@ -70,13 +69,13 @@ export const productsToUpload: Product[] = [
   {
     id: 'mens-chinos-slimfit-005',
     name: "Men's Slim-Fit Chinos",
-    price: 15.00, // KES 1500
+    price: 1500,
     imageUrl: 'https://placehold.co/600x800.png',
     dataAiHint: 'mens slim chinos',
     category: "Men's Fashion",
     subCategory: 'Bottoms',
     description: 'Modern slim-fit chinos in a comfortable stretch cotton. A versatile choice for any wardrobe.',
-    tags: ['men', 'chinos', 'slim-fit', 'trousers', 'trending'],
+    tags: ['men', 'chinos', 'slim-fit', 'trousers', 'trending', 'featured'],
     isFeatured: true,
     sizes: ['28W', '30W', '32W', '34W', '36W'],
     colors: [{ name: 'Khaki', hex: '#C3B091'}, { name: 'Navy', hex: '#000080'}, {name: 'Olive', hex: '#808000'}],
@@ -85,7 +84,7 @@ export const productsToUpload: Product[] = [
   {
     id: 'mens-cargo-pants-utility-006',
     name: "Men's Utility Cargo Pants",
-    price: 18.00, // KES 1800
+    price: 1800,
     imageUrl: 'https://placehold.co/600x800.png',
     dataAiHint: 'mens cargo pants',
     category: "Men's Fashion",
@@ -99,7 +98,7 @@ export const productsToUpload: Product[] = [
   {
     id: 'mens-shorts-chino-007',
     name: "Men's Chino Shorts",
-    price: 10.00, // KES 1000
+    price: 1000,
     imageUrl: 'https://placehold.co/600x800.png',
     dataAiHint: 'mens chino shorts',
     category: "Men's Fashion",
@@ -113,7 +112,7 @@ export const productsToUpload: Product[] = [
   {
     id: 'mens-joggers-fleece-008',
     name: "Men's Fleece Joggers",
-    price: 14.00, // KES 1400
+    price: 1400,
     imageUrl: 'https://placehold.co/600x800.png',
     dataAiHint: 'mens joggers',
     category: "Men's Fashion",
@@ -129,7 +128,7 @@ export const productsToUpload: Product[] = [
   {
     id: 'mens-denim-jacket-classic-009',
     name: "Men's Classic Denim Jacket",
-    price: 28.00, // KES 2800
+    price: 2800,
     imageUrl: 'https://placehold.co/600x800.png',
     dataAiHint: 'mens denim jacket',
     category: "Men's Fashion",
@@ -143,7 +142,7 @@ export const productsToUpload: Product[] = [
   {
     id: 'mens-bomber-jacket-lightweight-010',
     name: "Men's Lightweight Bomber Jacket",
-    price: 25.00, // KES 2500
+    price: 2500,
     imageUrl: 'https://placehold.co/600x800.png',
     dataAiHint: 'mens bomber jacket',
     category: "Men's Fashion",
@@ -157,7 +156,7 @@ export const productsToUpload: Product[] = [
   {
     id: 'mens-blazer-slimfit-011',
     name: "Men's Slim-Fit Casual Blazer",
-    price: 35.00, // KES 3500
+    price: 3500,
     imageUrl: 'https://placehold.co/600x800.png',
     dataAiHint: 'mens blazer',
     category: "Men's Fashion",
@@ -173,7 +172,7 @@ export const productsToUpload: Product[] = [
   {
     id: 'mens-loafers-casual-leather-012',
     name: "Men's Casual Leather Loafers",
-    price: 20.00, // KES 2000
+    price: 2000,
     imageUrl: 'https://placehold.co/800x600.png',
     dataAiHint: 'mens leather loafers',
     category: "Men's Fashion",
@@ -187,13 +186,13 @@ export const productsToUpload: Product[] = [
   {
     id: 'mens-sneakers-breathable-013',
     name: "Men's Breathable Mesh Sneakers",
-    price: 18.00, // KES 1800
+    price: 1800,
     imageUrl: 'https://placehold.co/800x600.png',
     dataAiHint: 'mens mesh sneakers',
     category: "Men's Fashion",
     subCategory: 'Footwear',
     description: 'Lightweight and breathable mesh sneakers, perfect for everyday wear and light activities.',
-    tags: ['men', 'shoes', 'sneakers', 'breathable', 'trending'],
+    tags: ['men', 'shoes', 'sneakers', 'breathable', 'trending', 'featured'],
     isFeatured: true,
     sizes: ['US 8', 'US 9', 'US 10', 'US 11', 'US 12'],
     colors: [{ name: 'Grey/Orange', hex: '#808080'}, { name: 'Black/White', hex: '#000000'}],
@@ -202,7 +201,7 @@ export const productsToUpload: Product[] = [
   {
     id: 'mens-formal-shoes-oxford-014',
     name: "Men's Classic Oxford Formal Shoes",
-    price: 30.00, // KES 3000
+    price: 3000,
     imageUrl: 'https://placehold.co/800x600.png',
     dataAiHint: 'mens oxford shoes',
     category: "Men's Fashion",
@@ -218,7 +217,7 @@ export const productsToUpload: Product[] = [
   {
     id: 'mens-watch-classic-015',
     name: "Men's Classic Chronograph Watch",
-    price: 45.00, // KES 4500
+    price: 4500,
     imageUrl: 'https://placehold.co/400x400.png',
     dataAiHint: 'mens watch',
     category: "Men's Fashion",
@@ -230,7 +229,7 @@ export const productsToUpload: Product[] = [
   {
     id: 'mens-belt-leather-016',
     name: "Men's Reversible Leather Belt",
-    price: 10.00, // KES 1000
+    price: 1000,
     imageUrl: 'https://placehold.co/400x400.png',
     dataAiHint: 'mens leather belt',
     category: "Men's Fashion",
@@ -244,13 +243,13 @@ export const productsToUpload: Product[] = [
   {
     id: 'womens-maxi-dress-floral-017',
     name: "Women's Floral Print Maxi Dress",
-    price: 25.00, // KES 2500
+    price: 2500,
     imageUrl: 'https://placehold.co/600x800.png',
     dataAiHint: 'womens maxi dress floral',
     category: "Women's Fashion",
     subCategory: 'Tops & Dresses',
     description: 'Elegant floral print maxi dress with a flattering silhouette. Perfect for summer events.',
-    tags: ['women', 'dress', 'maxi', 'floral', 'trending'],
+    tags: ['women', 'dress', 'maxi', 'floral', 'trending', 'featured'],
     isFeatured: true,
     sizes: ['S', 'M', 'L', 'XL'],
     colors: [{ name: 'Tropical Print', hex: '#FF69B4'}, { name: 'Blue Botanical', hex: '#4682B4'}],
@@ -259,7 +258,7 @@ export const productsToUpload: Product[] = [
   {
     id: 'womens-blouse-silk-018',
     name: "Women's Silk Button-Up Blouse",
-    price: 22.00, // KES 2200
+    price: 2200,
     imageUrl: 'https://placehold.co/600x800.png',
     dataAiHint: 'womens silk blouse',
     category: "Women's Fashion",
@@ -273,7 +272,7 @@ export const productsToUpload: Product[] = [
   {
     id: 'womens-tunic-embroidered-019',
     name: "Women's Embroidered Tunic Top",
-    price: 18.00, // KES 1800
+    price: 1800,
     imageUrl: 'https://placehold.co/600x800.png',
     dataAiHint: 'womens tunic top',
     category: "Women's Fashion",
@@ -287,13 +286,13 @@ export const productsToUpload: Product[] = [
   {
     id: 'womens-blazer-tailored-020',
     name: "Women's Tailored Single-Breasted Blazer",
-    price: 35.00, // KES 3500
+    price: 3500,
     imageUrl: 'https://placehold.co/600x800.png',
     dataAiHint: 'womens tailored blazer',
     category: "Women's Fashion",
-    subCategory: 'Tops & Dresses', // Can also be Outerwear
+    subCategory: 'Outerwear', // Consistent with user's list for Women's Blazers
     description: 'A chic tailored blazer that adds polish to any outfit. Single-breasted design.',
-    tags: ['women', 'blazer', 'jacket', 'tailored', 'workwear', 'trending'],
+    tags: ['women', 'blazer', 'jacket', 'tailored', 'workwear', 'trending', 'featured'],
     isFeatured: true,
     sizes: ['US 4', 'US 6', 'US 8', 'US 10'],
     colors: [{ name: 'Black', hex: '#000000'}, { name: 'Camel', hex: '#C19A6B'}],
@@ -304,7 +303,7 @@ export const productsToUpload: Product[] = [
   {
     id: 'womens-skirt-pleated-midi-021',
     name: "Women's Pleated Midi Skirt",
-    price: 18.00, // KES 1800
+    price: 1800,
     imageUrl: 'https://placehold.co/600x800.png',
     dataAiHint: 'womens pleated skirt',
     category: "Women's Fashion",
@@ -318,7 +317,7 @@ export const productsToUpload: Product[] = [
   {
     id: 'womens-leggings-highwaist-022',
     name: "Women's High-Waist Comfort Leggings",
-    price: 10.00, // KES 1000
+    price: 1000,
     imageUrl: 'https://placehold.co/600x800.png',
     dataAiHint: 'womens leggings',
     category: "Women's Fashion",
@@ -332,7 +331,7 @@ export const productsToUpload: Product[] = [
   {
     id: 'womens-pants-tailored-wideleg-023',
     name: "Women's Tailored Wide-Leg Pants",
-    price: 28.00, // KES 2800
+    price: 2800,
     imageUrl: 'https://placehold.co/600x800.png',
     dataAiHint: 'womens wide leg pants',
     category: "Women's Fashion",
@@ -348,7 +347,7 @@ export const productsToUpload: Product[] = [
   {
     id: 'womens-cardigan-longline-024',
     name: "Women's Longline Knit Cardigan",
-    price: 20.00, // KES 2000
+    price: 2000,
     imageUrl: 'https://placehold.co/600x800.png',
     dataAiHint: 'womens long cardigan',
     category: "Women's Fashion",
@@ -362,7 +361,7 @@ export const productsToUpload: Product[] = [
   {
     id: 'womens-trenchcoat-classic-025',
     name: "Women's Classic Trench Coat",
-    price: 45.00, // KES 4500
+    price: 4500,
     imageUrl: 'https://placehold.co/600x800.png',
     dataAiHint: 'womens trench coat',
     category: "Women's Fashion",
@@ -376,7 +375,7 @@ export const productsToUpload: Product[] = [
   {
     id: 'womens-shawl-cashmereblend-026',
     name: "Women's Cashmere Blend Shawl",
-    price: 30.00, // KES 3000
+    price: 3000,
     imageUrl: 'https://placehold.co/600x800.png',
     dataAiHint: 'womens cashmere shawl',
     category: "Women's Fashion",
@@ -392,7 +391,7 @@ export const productsToUpload: Product[] = [
   {
     id: 'womens-heels-pointedtoe-027',
     name: "Women's Classic Pointed-Toe Heels",
-    price: 25.00, // KES 2500
+    price: 2500,
     imageUrl: 'https://placehold.co/800x600.png',
     dataAiHint: 'womens pointed heels',
     category: "Women's Fashion",
@@ -406,7 +405,7 @@ export const productsToUpload: Product[] = [
   {
     id: 'womens-flats-ballet-028',
     name: "Women's Comfortable Ballet Flats",
-    price: 15.00, // KES 1500
+    price: 1500,
     imageUrl: 'https://placehold.co/800x600.png',
     dataAiHint: 'womens ballet flats',
     category: "Women's Fashion",
@@ -420,7 +419,7 @@ export const productsToUpload: Product[] = [
   {
     id: 'womens-sandals-strappy-029',
     name: "Women's Strappy Summer Sandals",
-    price: 12.00, // KES 1200
+    price: 1200,
     imageUrl: 'https://placehold.co/800x600.png',
     dataAiHint: 'womens strappy sandals',
     category: "Women's Fashion",
@@ -434,7 +433,7 @@ export const productsToUpload: Product[] = [
   {
     id: 'womens-boots-ankleriding-030',
     name: "Women's Ankle Riding Boots",
-    price: 35.00, // KES 3500
+    price: 3500,
     imageUrl: 'https://placehold.co/800x600.png',
     dataAiHint: 'womens ankle boots',
     category: "Women's Fashion",
@@ -450,13 +449,13 @@ export const productsToUpload: Product[] = [
   {
     id: 'womens-handbag-statement-031',
     name: "Women's Statement Leather Handbag",
-    price: 40.00, // KES 4000
+    price: 4000,
     imageUrl: 'https://placehold.co/800x600.png',
     dataAiHint: 'womens leather handbag',
     category: "Women's Fashion",
     subCategory: 'Accessories',
     description: 'A chic and spacious leather handbag that makes a statement. Multiple compartments.',
-    tags: ['women', 'accessories', 'handbag', 'leather', 'statement', 'trending'],
+    tags: ['women', 'accessories', 'handbag', 'leather', 'statement', 'trending', 'featured'],
     isFeatured: true,
     sizes: ['One Size'],
     colors: [{ name: 'Burgundy', hex: '#800020'}, { name: 'Forest Green', hex: '#228B22'}],
@@ -465,7 +464,7 @@ export const productsToUpload: Product[] = [
   {
     id: 'womens-scarf-silkprint-032',
     name: "Women's Silk Print Scarf",
-    price: 10.00, // KES 1000
+    price: 1000,
     imageUrl: 'https://placehold.co/600x600.png',
     dataAiHint: 'womens silk scarf',
     category: "Women's Fashion",
@@ -479,7 +478,7 @@ export const productsToUpload: Product[] = [
   {
     id: 'womens-jewelry-earrings-033',
     name: "Women's Gold Hoop Earrings",
-    price: 8.00, // KES 800
+    price: 800,
     imageUrl: 'https://placehold.co/400x400.png',
     dataAiHint: 'womens gold earrings',
     category: "Women's Fashion",
@@ -491,7 +490,7 @@ export const productsToUpload: Product[] = [
   {
     id: 'womens-hat-sunhat-widebrim-034',
     name: "Women's Wide-Brim Sun Hat",
-    price: 12.00, // KES 1200
+    price: 1200,
     imageUrl: 'https://placehold.co/600x600.png',
     dataAiHint: 'womens sun hat',
     category: "Women's Fashion",
@@ -505,13 +504,13 @@ export const productsToUpload: Product[] = [
   {
     id: 'kids-graphictee-unisex-035',
     name: "Kids' Unisex Animal Graphic Tee",
-    price: 6.00, // KES 600
+    price: 600,
     imageUrl: 'https://placehold.co/600x800.png',
     dataAiHint: 'kids graphic tee animal',
     category: "Kids' Fashion",
     subCategory: 'Boys & Girls',
     description: 'Fun and soft cotton t-shirt with a cute animal graphic. Available for boys and girls.',
-    tags: ['kids', 'unisex', 't-shirt', 'graphic', 'animal', 'trending'],
+    tags: ['kids', 'unisex', 't-shirt', 'graphic', 'animal', 'trending', 'featured'],
     isFeatured: true,
     sizes: ['2T', '3T', '4T', '5Y', '6Y'],
     colors: [{ name: 'Yellow Lion', hex: '#FFD700'}, { name: 'Blue Elephant', hex: '#ADD8E6'}],
@@ -520,13 +519,13 @@ export const productsToUpload: Product[] = [
   {
     id: 'kids-romper-cotton-036',
     name: "Kids' Organic Cotton Romper",
-    price: 10.00, // KES 1000
+    price: 1000,
     imageUrl: 'https://placehold.co/600x800.png',
     dataAiHint: 'kids cotton romper',
     category: "Kids' Fashion",
     subCategory: 'Boys & Girls',
     description: 'Adorable and comfortable organic cotton romper for babies and toddlers. Snap closures for easy changing.',
-    tags: ['kids', 'baby', 'romper', 'organic cotton', 'trending'],
+    tags: ['kids', 'baby', 'romper', 'organic cotton', 'trending', 'featured'],
     isFeatured: true,
     sizes: ['0-3M', '3-6M', '6-12M', '12-18M'],
     colors: [{ name: 'Striped Grey', hex: '#D3D3D3'}, { name: 'Pastel Green', hex: '#98FB98'}],
@@ -535,11 +534,11 @@ export const productsToUpload: Product[] = [
   {
     id: 'kids-dress-girls-party-037',
     name: "Girls' Twirl Party Dress",
-    price: 15.00, // KES 1500
+    price: 1500,
     imageUrl: 'https://placehold.co/600x800.png',
     dataAiHint: 'girls party dress',
     category: "Kids' Fashion",
-    subCategory: 'Boys & Girls', // Or specific to Girls
+    subCategory: 'Boys & Girls', 
     description: 'A beautiful party dress for girls with a full, twirly skirt. Perfect for special occasions.',
     tags: ['kids', 'girls', 'dress', 'party', 'occasion'],
     sizes: ['4Y', '5Y', '6Y', '7Y', '8Y'],
@@ -549,13 +548,13 @@ export const productsToUpload: Product[] = [
   {
     id: 'kids-schooluniform-polo-038',
     name: "Kids' School Uniform Polo Shirt",
-    price: 8.00, // KES 800
+    price: 800,
     imageUrl: 'https://placehold.co/600x800.png',
     dataAiHint: 'kids school polo',
     category: "Kids' Fashion",
-    subCategory: 'Boys & Girls', // Or Schoolwear
+    subCategory: 'Schoolwear',
     description: 'Durable and comfortable polo shirt for school uniforms. Available in standard school colors.',
-    tags: ['kids', 'school', 'uniform', 'polo', 'trending'],
+    tags: ['kids', 'school', 'uniform', 'polo', 'trending', 'featured'],
     isFeatured: true,
     sizes: ['XS (4-5Y)', 'S (6-7Y)', 'M (8-9Y)', 'L (10-12Y)'],
     colors: [{ name: 'White', hex: '#FFFFFF'}, { name: 'Royal Blue', hex: '#4169E1'}, {name: 'Bottle Green', hex: '#006A4E'}],
@@ -566,7 +565,7 @@ export const productsToUpload: Product[] = [
   {
     id: 'kids-sneakers-velcro-039',
     name: "Kids' Easy Velcro Sneakers",
-    price: 12.00, // KES 1200
+    price: 1200,
     imageUrl: 'https://placehold.co/800x600.png',
     dataAiHint: 'kids velcro sneakers',
     category: "Kids' Fashion",
@@ -580,7 +579,7 @@ export const productsToUpload: Product[] = [
   {
     id: 'kids-sandals-summer-040',
     name: "Kids' Summer Adventure Sandals",
-    price: 8.00, // KES 800
+    price: 800,
     imageUrl: 'https://placehold.co/800x600.png',
     dataAiHint: 'kids summer sandals',
     category: "Kids' Fashion",
@@ -594,11 +593,11 @@ export const productsToUpload: Product[] = [
   {
     id: 'kids-schoolshoes-leather-041',
     name: "Kids' Black Leather School Shoes",
-    price: 15.00, // KES 1500
+    price: 1500,
     imageUrl: 'https://placehold.co/800x600.png',
     dataAiHint: 'kids school shoes black',
     category: "Kids' Fashion",
-    subCategory: 'Footwear', // Or Schoolwear
+    subCategory: 'Schoolwear',
     description: 'Smart and sturdy black leather school shoes. Designed for comfort and durability.',
     tags: ['kids', 'shoes', 'school', 'leather', 'formal'],
     sizes: ['Kids 10', 'Kids 11', 'Kids 12', 'Kids 13', 'Youth 1', 'Youth 2'],
@@ -610,7 +609,7 @@ export const productsToUpload: Product[] = [
   {
     id: 'kids-cap-baseball-042',
     name: "Kids' Character Baseball Cap",
-    price: 5.00, // KES 500
+    price: 500,
     imageUrl: 'https://placehold.co/400x400.png',
     dataAiHint: 'kids character cap',
     category: "Kids' Fashion",
@@ -622,11 +621,11 @@ export const productsToUpload: Product[] = [
   {
     id: 'kids-backpack-school-043',
     name: "Kids' School Backpack - Medium",
-    price: 12.00, // KES 1200
+    price: 1200,
     imageUrl: 'https://placehold.co/600x800.png',
     dataAiHint: 'kids school backpack',
     category: "Kids' Fashion",
-    subCategory: 'Accessories', // Or Schoolwear
+    subCategory: 'Schoolwear', 
     description: 'Durable and spacious school backpack with multiple compartments. Ergonomic design.',
     tags: ['kids', 'accessories', 'backpack', 'school'],
     sku: 'CS-KBKP-043',
@@ -634,7 +633,7 @@ export const productsToUpload: Product[] = [
   {
     id: 'kids-socks-multipack-044',
     name: "Kids' Cotton Socks (5-Pack)",
-    price: 6.00, // KES 600
+    price: 600,
     imageUrl: 'https://placehold.co/400x400.png',
     dataAiHint: 'kids cotton socks',
     category: "Kids' Fashion",
@@ -643,13 +642,10 @@ export const productsToUpload: Product[] = [
     tags: ['kids', 'accessories', 'socks', 'cotton'],
     sku: 'CS-KSOCK-044',
   },
-  // Add more example products here to reach desired numbers, diversifying subcategories...
-  // For instance:
-  // More Men's Tops
   {
     id: 'mens-tshirt-basic-045',
     name: "Men's Basic Cotton T-Shirt",
-    price: 8.00, // KES 800
+    price: 800,
     imageUrl: 'https://placehold.co/600x800.png',
     dataAiHint: 'mens basic t-shirt',
     category: "Men's Fashion",
@@ -660,11 +656,10 @@ export const productsToUpload: Product[] = [
     colors: [{ name: 'White', hex: '#FFFFFF'}, { name: 'Black', hex: '#000000'}, { name: 'Navy', hex: '#000080'}],
     sku: 'CS-MBTS-045',
   },
-  // More Women's Dresses
   {
     id: 'womens-dress-shirt-046',
     name: "Women's Classic Shirt Dress",
-    price: 28.00, // KES 2800
+    price: 2800,
     imageUrl: 'https://placehold.co/600x800.png',
     dataAiHint: 'womens shirt dress',
     category: "Women's Fashion",
@@ -675,11 +670,10 @@ export const productsToUpload: Product[] = [
     colors: [{ name: 'Denim Blue', hex: '#6495ED'}, { name: 'Olive Green', hex: '#808000'}],
     sku: 'CS-WDRS-046',
   },
-  // More Kids
   {
     id: 'kids-jeans-boys-047',
     name: "Boys' Durable Denim Jeans",
-    price: 12.00, // KES 1200
+    price: 1200,
     imageUrl: 'https://placehold.co/600x800.png',
     dataAiHint: 'boys denim jeans',
     category: "Kids' Fashion",
@@ -693,7 +687,7 @@ export const productsToUpload: Product[] = [
   {
     id: 'kids-leggings-girls-048',
     name: "Girls' Printed Cotton Leggings",
-    price: 7.00, // KES 700
+    price: 700,
     imageUrl: 'https://placehold.co/600x800.png',
     dataAiHint: 'girls printed leggings',
     category: "Kids' Fashion",
@@ -704,15 +698,14 @@ export const productsToUpload: Product[] = [
     colors: [{ name: 'Hearts Print', hex: '#FF69B4'}, { name: 'Stars Print', hex: '#FFD700'}],
     sku: 'CS-KGLEG-048',
   },
-  // Sample of "Sale" category item - this should reflect a discount
   {
     id: 'sale-mens-polo-striped-049',
     name: "Men's Striped Polo (Sale)",
-    price: 9.00, // KES 900 (discounted)
-    originalPrice: 15.00, // KES 1500
+    price: 900,
+    originalPrice: 1500,
     imageUrl: 'https://placehold.co/600x800.png',
     dataAiHint: 'mens striped polo sale',
-    category: "Sale", // Specific category for sale items
+    category: "Sale",
     subCategory: "Men's Sale",
     description: 'Stylish striped polo shirt, now on sale. Limited stock.',
     tags: ['men', 'polo', 'sale', 'striped'],
@@ -723,8 +716,8 @@ export const productsToUpload: Product[] = [
   {
     id: 'sale-womens-dress-summer-050',
     name: "Women's Summer Sundress (Sale)",
-    price: 12.00, // KES 1200 (discounted)
-    originalPrice: 20.00, // KES 2000
+    price: 1200,
+    originalPrice: 2000,
     imageUrl: 'https://placehold.co/600x800.png',
     dataAiHint: 'womens sundress sale',
     category: "Sale",
@@ -785,6 +778,69 @@ export const collectionsToUpload: Collection[] = [
     productIds: ['sale-mens-polo-striped-049', 'sale-womens-dress-summer-050'],
   }
 ];
+
+export const ordersToUpload: Omit<Order, 'id'>[] = [
+  {
+    customerName: 'Alice Wonderland',
+    customerEmail: 'alice@example.com',
+    orderDate: '2024-03-10', // Using YYYY-MM-DD string format for simplicity
+    totalAmount: 12550, // KES
+    status: 'Shipped',
+    items: [
+      { productId: 'mens-polo-classic-001', name: "Men's Classic Pique Polo", quantity: 1, price: 1200, imageUrl: 'https://placehold.co/100x100.png' },
+      { productId: 'womens-maxi-dress-floral-017', name: "Women's Floral Print Maxi Dress", quantity: 1, price: 2500, imageUrl: 'https://placehold.co/100x100.png' },
+      { productId: 'kids-graphictee-unisex-035', name: "Kids' Unisex Animal Graphic Tee", quantity: 2, price: 600, imageUrl: 'https://placehold.co/100x100.png' },
+    ],
+    shippingAddress: { address: '123 Ngong Rd', city: 'Nairobi', postalCode: '00100', country: 'Kenya' }
+  },
+  {
+    customerName: 'Bob The Builder',
+    customerEmail: 'bob@example.com',
+    orderDate: '2024-03-11',
+    totalAmount: 7800,
+    status: 'Processing',
+    items: [
+      { productId: 'mens-chinos-slimfit-005', name: "Men's Slim-Fit Chinos", quantity: 1, price: 1500, imageUrl: 'https://placehold.co/100x100.png' },
+      { productId: 'womens-blouse-silk-018', name: "Women's Silk Button-Up Blouse", quantity: 1, price: 2200, imageUrl: 'https://placehold.co/100x100.png' },
+    ],
+    shippingAddress: { address: '456 Waiyaki Way', city: 'Nairobi', postalCode: '00200', country: 'Kenya' }
+  },
+  {
+    customerName: 'Charlie Brown',
+    customerEmail: 'charlie@example.com',
+    orderDate: '2024-03-12',
+    totalAmount: 21075,
+    status: 'Delivered',
+    items: [
+      { productId: 'mens-sneakers-breathable-013', name: "Men's Breathable Mesh Sneakers", quantity: 1, price: 1800, imageUrl: 'https://placehold.co/100x100.png' },
+      { productId: 'womens-heels-pointedtoe-027', name: "Women's Classic Pointed-Toe Heels", quantity: 1, price: 2500, imageUrl: 'https://placehold.co/100x100.png' },
+    ],
+    shippingAddress: { address: '789 Mombasa Rd', city: 'Mombasa', postalCode: '80100', country: 'Kenya' }
+  },
+  {
+    customerName: 'Diana Prince',
+    customerEmail: 'diana@example.com',
+    orderDate: '2024-03-13',
+    totalAmount: 4520,
+    status: 'Pending',
+    items: [
+      { productId: 'kids-romper-cotton-036', name: "Kids' Organic Cotton Romper", quantity: 1, price: 1000, imageUrl: 'https://placehold.co/100x100.png' }
+    ],
+    shippingAddress: { address: '101 Kenyatta Ave', city: 'Nakuru', postalCode: '20100', country: 'Kenya' }
+  },
+  {
+    customerName: 'Edward Scissorhands',
+    customerEmail: 'edward@example.com',
+    orderDate: '2024-03-14',
+    totalAmount: 9999,
+    status: 'Cancelled',
+    items: [
+      { productId: 'mens-denim-jacket-classic-009', name: "Men's Classic Denim Jacket", quantity: 1, price: 2800, imageUrl: 'https://placehold.co/100x100.png' }
+    ],
+     shippingAddress: { address: '222 Oginga Odinga St', city: 'Kisumu', postalCode: '40100', country: 'Kenya' }
+  },
+];
+
 
 // Note: This file is now primarily for generating data for the Firestore population script.
 // The application itself will fetch data from Firestore.

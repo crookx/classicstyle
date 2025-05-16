@@ -9,7 +9,6 @@ import Image from 'next/image';
 import { PlusCircle, Edit, Trash2, Eye } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
-// This component fetches data on the server.
 export default async function AdminProductsPage() {
   const products: Product[] = await getProducts(); 
 
@@ -62,7 +61,7 @@ export default async function AdminProductsPage() {
                     <TableCell className="font-medium">{product.name}</TableCell>
                     <TableCell className="hidden md:table-cell">{product.sku || 'N/A'}</TableCell>
                     <TableCell className="hidden lg:table-cell">{product.category || 'N/A'}</TableCell>
-                    <TableCell className="text-right">${product.price.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">KSh {product.price.toFixed(2)}</TableCell>
                     <TableCell className="text-center hidden md:table-cell">
                       <Badge variant={product.isFeatured ? "default" : "outline"}>
                         {product.isFeatured ? "Featured" : "Active"}
@@ -74,11 +73,11 @@ export default async function AdminProductsPage() {
                           <a><Eye className="h-4 w-4" /></a>
                         </Button>
                       </Link>
-                      {/* Edit and Delete actions would require server actions and forms/modals */}
-                      <Button variant="ghost" size="icon" disabled title="Edit Product (coming soon)">
-                        <Edit className="h-4 w-4" />
-                        <span className="sr-only">Edit</span>
-                      </Button>
+                      <Link href={`/admin/products/${product.id}/edit`} passHref legacyBehavior>
+                        <Button variant="ghost" size="icon" asChild title="Edit Product (coming soon)" disabled>
+                           <a><Edit className="h-4 w-4" /></a>
+                        </Button>
+                      </Link>
                       <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive hover:bg-destructive/10" disabled title="Delete Product (coming soon)">
                         <Trash2 className="h-4 w-4" />
                         <span className="sr-only">Delete</span>

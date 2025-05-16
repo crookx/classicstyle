@@ -10,7 +10,7 @@ import { useWishlist } from '@/contexts/WishlistContext';
 import { useCart } from '@/contexts/CartContext';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { useRouter } from 'next/navigation'; // Keep if redirecting, remove if not used in this component directly
+import { useRouter } from 'next/navigation'; 
 import { cn } from '@/lib/utils';
 
 interface ProductCardProps {
@@ -22,11 +22,11 @@ export default function ProductCard({ product }: ProductCardProps) {
   const { addToCart } = useCart();
   const { toast } = useToast();
   const { currentUser, loading: authLoading } = useAuth();
-  const router = useRouter(); // Used for redirecting to login
+  const router = useRouter(); 
 
   const handleWishlistToggle = (e: React.MouseEvent) => {
-    e.preventDefault(); // Prevent link navigation if card is wrapped in Link
-    e.stopPropagation(); // Stop event from bubbling up
+    e.preventDefault(); 
+    e.stopPropagation(); 
     if (authLoading) return;
     if (!currentUser) {
       toast({
@@ -34,7 +34,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         description: 'Please log in to add items to your wishlist.',
         variant: 'destructive',
       });
-      router.push(`/login?redirect=${window.location.pathname}`); // Use current path for redirect
+      router.push(`/login?redirect=${window.location.pathname}`); 
       return;
     }
 
@@ -48,8 +48,8 @@ export default function ProductCard({ product }: ProductCardProps) {
   };
 
   const handleAddToCart = (e: React.MouseEvent) => {
-    e.preventDefault(); // Prevent link navigation if card is wrapped in Link
-    e.stopPropagation(); // Stop event from bubbling up
+    e.preventDefault(); 
+    e.stopPropagation(); 
     if (authLoading) return;
     if (!currentUser) {
       toast({
@@ -57,7 +57,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         description: 'Please log in to add items to your cart.',
         variant: 'destructive',
       });
-      router.push(`/login?redirect=${window.location.pathname}`); // Use current path for redirect
+      router.push(`/login?redirect=${window.location.pathname}`); 
       return;
     }
     addToCart(product);
@@ -69,10 +69,10 @@ export default function ProductCard({ product }: ProductCardProps) {
       <CardHeader className="p-0 relative">
         <Link href={`/products/${product.id}`} className="block aspect-[4/5] overflow-hidden group">
           <Image
-            src={product.imageUrl}
+            src={product.imageUrl || 'https://placehold.co/600x750.png'}
             alt={product.name}
             width={600}
-            height={750} // Adjusted to match 4/5 aspect ratio
+            height={750} 
             className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-300"
             data-ai-hint={product.dataAiHint || product.category || 'product image'}
           />
@@ -111,9 +111,9 @@ export default function ProductCard({ product }: ProductCardProps) {
         </Link>
         {product.category && <p className="text-xs text-muted-foreground mb-2">{product.category}{product.subCategory ? ` - ${product.subCategory}` : ''}</p>}
         <p className="text-base font-semibold text-foreground">
-          ${product.price.toFixed(2)}
+          KSh {product.price.toFixed(2)}
           {product.originalPrice && (
-            <span className="ml-2 text-sm text-muted-foreground line-through">${product.originalPrice.toFixed(2)}</span>
+            <span className="ml-2 text-sm text-muted-foreground line-through">KSh {product.originalPrice.toFixed(2)}</span>
             )}
         </p>
       </CardContent>

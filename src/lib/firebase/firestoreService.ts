@@ -1,6 +1,6 @@
 
 import { db } from '@/lib/firebase';
-import type { Product, Collection } from '@/types';
+import type { Product, Collection, Order } from '@/types';
 import { 
   collection, 
   doc, 
@@ -10,26 +10,34 @@ import {
   query, 
   where, 
   limit,
-  Timestamp, // If you decide to use Timestamps
+  Timestamp, 
   writeBatch,
   serverTimestamp,
-  documentId
+  documentId,
+  getCountFromServer // For counting documents
 } from 'firebase/firestore';
 
 const PRODUCTS_COLLECTION = 'products';
 const COLLECTIONS_COLLECTION = 'collections';
+const ORDERS_COLLECTION = 'orders';
 
-// Helper function to convert Firestore doc data to Product/Collection type
-// Handles potential null values from Firestore and ensures type safety
+
 const fromFirestore = <T extends { id: string }>(docSnap: ReturnType<typeof getDoc> | any): T | null => {
   if (!docSnap.exists()) {
     return null;
   }
   const data = docSnap.data();
-  // Convert Timestamps to Date objects or string representations if necessary
-  // For now, we assume Timestamps are handled or not used directly in the Product/Collection types
-  // or that they are stored as strings/numbers if simpler.
-  // Example: if (data.createdAt && data.createdAt.toDate) data.createdAt = data.createdAt.toDate();
+  
+  // Convert Firestore Timestamps to JS Date objects if they exist
+  // This is a common practice, but depends on how you want to handle dates in your app
+  // For now, assuming dates are stored as strings or will be handled appropriately by components
+  // Example of handling timestamps:
+  // for (const key in data) {
+  //   if (data[key] instanceof Timestamp) {
+  //     data[key] = data[key].toDate();
+  //   }
+  // }
+  
   return { id: docSnap.id, ...data } as T;
 };
 
@@ -45,6 +53,19 @@ export async function getProducts(count?: number): Promise<Product[]> {
   } catch (error) {
     console.error(`[FirestoreService] Error fetching products from '${collectionPath}':`, error);
     return [];
+  }
+}
+
+export async function getProductsCount(): Promise<number> {
+  const collectionPath = PRODUCTS_COLLECTION;
+  console.log(`[FirestoreService] Attempting to count documents in collection: '${collectionPath}'.`);
+  try {
+    const productsRef = collection(db, collectionPath);
+    const snapshot = await getCountFromServer(productsRef);
+    return snapshot.data().count;
+  } catch (error) {
+    console.error(`[FirestoreService] Error counting products in '${collectionPath}':`, error);
+    return 0;
   }
 }
 
@@ -83,8 +104,6 @@ export async function getProductsByIds(ids: string[]): Promise<Product[]> {
   const collectionPath = PRODUCTS_COLLECTION;
   console.log(`[FirestoreService] Attempting to read from collection: '${collectionPath}' for getProductsByIds.`);
   try {
-    // Firestore 'in' query supports up to 30 elements per query.
-    // For more, split into multiple queries.
     const CHUNK_SIZE = 30;
     const productPromises: Promise<Product[]>[] = [];
 
@@ -115,7 +134,7 @@ export async function getProductsByCategoryId(categoryId: string, excludeProduct
   console.log(`[FirestoreService] Attempting to read from collection: '${collectionPath}' for getProductsByCategoryId with category '${categoryId}'.`);
   try {
     const productsRef = collection(db, collectionPath);
-    let q = query(productsRef, where('category', '==', categoryId), limit(count + (excludeProductId ? 1 : 0) )); // Fetch one extra if excluding
+    let q = query(productsRef, where('category', '==', categoryId), limit(count + (excludeProductId ? 1 : 0) )); 
     
     const querySnapshot = await getDocs(q);
     let products = querySnapshot.docs.map(docSnap => fromFirestore<Product>(docSnap)).filter(p => p !== null) as Product[];
@@ -164,46 +183,45 @@ export async function getCollectionBySlug(slug: string): Promise<Collection | nu
   }
 }
 
-// For Admin: Add Product
 export async function addProduct(productData: Omit<Product, 'id'>): Promise<Product | null> {
   const collectionPath = PRODUCTS_COLLECTION;
   console.log(`[FirestoreService] Attempting to write to collection: '${collectionPath}' for addProduct.`);
   try {
-    // Add server-side timestamp for creation
     const dataWithTimestamp = {
       ...productData,
-      // createdAt: serverTimestamp(), // Example if using server timestamps
+      // createdAt: serverTimestamp(), 
       // updatedAt: serverTimestamp(),
     };
     const docRef = await addDoc(collection(db, collectionPath), dataWithTimestamp);
-    return { id: docRef.id, ...productData } as Product; // Return with the new ID
+    // Fetch the newly created document to ensure consistency (optional, but good practice)
+    // const newDocSnap = await getDoc(docRef);
+    // return fromFirestore<Product>(newDocSnap);
+    // For simplicity here, we construct the object directly
+    return { id: docRef.id, ...productData } as Product;
   } catch (error) {
     console.error(`[FirestoreService] Error adding product to Firestore collection '${collectionPath}':`, error);
     return null;
   }
 }
 
+// Fetch Orders
+export async function getOrders(count?: number): Promise<Order[]> {
+  const collectionPath = ORDERS_COLLECTION;
+  console.log(`[FirestoreService] Attempting to read from collection: '${collectionPath}' for getOrders.`);
+  try {
+    const ordersRef = collection(db, collectionPath);
+    // Add orderBy('orderDate', 'desc') if dates were Timestamps and you want recent orders
+    const q = count ? query(ordersRef, limit(count)) : ordersRef;
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(docSnap => fromFirestore<Order>(docSnap)).filter(o => o !== null) as Order[];
+  } catch (error) {
+    console.error(`[FirestoreService] Error fetching orders from '${collectionPath}':`, error);
+    return [];
+  }
+}
+
 // Placeholder for updating a product
-// export async function updateProduct(productId: string, productData: Partial<Product>): Promise<boolean> {
-//   try {
-//     const docRef = doc(db, PRODUCTS_COLLECTION, productId);
-//     await updateDoc(docRef, { ...productData, updatedAt: serverTimestamp() });
-//     return true;
-//   } catch (error) {
-//     console.error(`Error updating product ${productId}:`, error);
-//     return false;
-//   }
-// }
+// export async function updateProduct(productId: string, productData: Partial<Product>): Promise<boolean> { ... }
 
 // Placeholder for deleting a product
-// export async function deleteProduct(productId: string): Promise<boolean> {
-//   try {
-//     const docRef = doc(db, PRODUCTS_COLLECTION, productId);
-//     await deleteDoc(docRef);
-//     return true;
-//   } catch (error) {
-//     console.error(`Error deleting product ${productId}:`, error);
-//     return false;
-//   }
-// }
-
+// export async function deleteProduct(productId: string): Promise<boolean> { ... }

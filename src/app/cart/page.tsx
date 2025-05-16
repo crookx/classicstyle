@@ -1,3 +1,4 @@
+
 'use client';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -48,7 +49,7 @@ export default function CartPage() {
             <Card key={item.id} className="flex flex-col sm:flex-row items-center p-4 gap-4 shadow-md rounded-lg">
               <Link href={`/products/${item.id}`} className="shrink-0">
                 <Image
-                  src={item.imageUrl}
+                  src={item.imageUrl || 'https://placehold.co/100x120.png'}
                   alt={item.name}
                   width={100}
                   height={120}
@@ -60,7 +61,7 @@ export default function CartPage() {
                   <h2 className="text-lg font-semibold font-serif hover:text-primary">{item.name}</h2>
                 </Link>
                 <p className="text-sm text-muted-foreground">{item.category}</p>
-                <p className="text-md font-medium text-primary">${item.price.toFixed(2)}</p>
+                <p className="text-md font-medium text-primary">KSh {item.price.toFixed(2)}</p>
               </div>
               <div className="flex items-center space-x-2">
                 <Button
@@ -115,7 +116,7 @@ export default function CartPage() {
           <CardContent className="space-y-4 p-0">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Subtotal ({totalItems} items)</span>
-              <span>${totalPrice.toFixed(2)}</span>
+              <span>KSh {totalPrice.toFixed(2)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Shipping</span>
@@ -128,7 +129,7 @@ export default function CartPage() {
             <Separator />
             <div className="flex justify-between text-xl font-bold">
               <span>Total</span>
-              <span>${totalPrice.toFixed(2)}</span>
+              <span>KSh {totalPrice.toFixed(2)}</span>
             </div>
           </CardContent>
           <CardFooter className="p-0 pt-6">
