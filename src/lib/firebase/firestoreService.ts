@@ -1,29 +1,35 @@
 
 import { db } from '@/lib/firebase';
-import type { Product, Collection, Order, UserProfile, OrderStatus } from '@/types';
-import { 
-  collection, 
-  doc, 
-  getDoc, 
-  getDocs, 
-  addDoc, 
+import type { Product, Collection, Order, UserProfile, OrderStatus, UserCartItem, UserCartDocument, UserWishlistDocument, UserWishlistItem } from '@/types';
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  addDoc,
   updateDoc,
   deleteDoc,
-  query, 
-  where, 
+  query,
+  where,
   limit,
-  Timestamp, 
+  Timestamp,
   writeBatch,
   serverTimestamp,
   documentId,
   getCountFromServer,
-  setDoc 
+  setDoc,
+  runTransaction,
+  arrayUnion,
+  arrayRemove,
+  orderBy
 } from 'firebase/firestore';
 
 const PRODUCTS_COLLECTION = 'products';
 const COLLECTIONS_COLLECTION = 'collections';
 const ORDERS_COLLECTION = 'orders';
 const USERS_COLLECTION = 'users';
+const CARTS_COLLECTION = 'carts';
+const WISHLISTS_COLLECTION = 'wishlists';
 
 
 const fromFirestore = <T extends { id: string }>(docSnap: ReturnType<typeof getDoc> | any): T | null => {
@@ -31,21 +37,30 @@ const fromFirestore = <T extends { id: string }>(docSnap: ReturnType<typeof getD
     return null;
   }
   const data = docSnap.data();
-  
-  const convertTimestamps = (obj: any) => {
-    if (!obj) return;
+
+  const convertTimestamps = (obj: any): any => {
+    if (!obj) return obj;
+    if (Array.isArray(obj)) {
+        return obj.map(item => convertTimestamps(item));
+    }
+    if (typeof obj !== 'object') return obj;
+
+    const newObj: {[key: string]: any} = {};
     for (const key in obj) {
       if (obj[key] instanceof Timestamp) {
-        obj[key] = obj[key].toDate().toISOString(); 
+        newObj[key] = obj[key].toDate().toISOString();
       } else if (typeof obj[key] === 'object' && obj[key] !== null) {
-        convertTimestamps(obj[key]); 
+        newObj[key] = convertTimestamps(obj[key]);
+      } else {
+        newObj[key] = obj[key];
       }
     }
+    return newObj;
   };
 
-  const dataWithConvertedTimestamps = { ...data };
-  convertTimestamps(dataWithConvertedTimestamps);
-  
+
+  const dataWithConvertedTimestamps = convertTimestamps({ ...data });
+
   return { id: docSnap.id, ...dataWithConvertedTimestamps } as T;
 };
 
@@ -55,7 +70,7 @@ export async function getProducts(count?: number): Promise<Product[]> {
   console.log(`[FirestoreService] getProducts: Attempting to read from collection: '${collectionPath}'.`);
   try {
     const productsRef = collection(db, collectionPath);
-    const q = count ? query(productsRef, limit(count)) : productsRef;
+    const q = count ? query(productsRef, orderBy("createdAt", "desc"), limit(count)) : query(productsRef, orderBy("createdAt", "desc"));
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(docSnap => fromFirestore<Product>(docSnap)).filter(p => p !== null) as Product[];
   } catch (error) {
@@ -82,7 +97,7 @@ export async function getFeaturedProducts(count: number = 6): Promise<Product[]>
   console.log(`[FirestoreService] getFeaturedProducts: Attempting to read from collection: '${collectionPath}' with 'isFeatured' filter.`);
   try {
     const productsRef = collection(db, collectionPath);
-    const q = query(productsRef, where('isFeatured', '==', true), limit(count));
+    const q = query(productsRef, where('isFeatured', '==', true), orderBy("createdAt", "desc"), limit(count));
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(docSnap => fromFirestore<Product>(docSnap)).filter(p => p !== null) as Product[];
   } catch (error) {
@@ -93,6 +108,10 @@ export async function getFeaturedProducts(count: number = 6): Promise<Product[]>
 
 
 export async function getProductById(id: string): Promise<Product | null> {
+  if (!id) {
+    console.warn("[FirestoreService] getProductById: Called with null or undefined ID.");
+    return null;
+  }
   const docPath = `${PRODUCTS_COLLECTION}/${id}`;
   console.log(`[FirestoreService] getProductById: Attempting to read document: '${docPath}'.`);
   try {
@@ -112,16 +131,17 @@ export async function getProductsByIds(ids: string[]): Promise<Product[]> {
   const collectionPath = PRODUCTS_COLLECTION;
   console.log(`[FirestoreService] getProductsByIds: Attempting to read from collection: '${collectionPath}' for IDs: ${ids.join(', ')}.`);
   try {
-    const CHUNK_SIZE = 30; 
+    const CHUNK_SIZE = 30;
     const productPromises: Promise<Product[]>[] = [];
 
     for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
         const chunk = ids.slice(i, i + CHUNK_SIZE);
         if (chunk.length > 0) {
              const productsRef = collection(db, collectionPath);
+             // Firestore 'in' queries are limited to 30 items in the array
              const q = query(productsRef, where(documentId(), 'in', chunk));
              productPromises.push(
-                getDocs(q).then(snapshot => 
+                getDocs(q).then(snapshot =>
                     snapshot.docs.map(docSnap => fromFirestore<Product>(docSnap)).filter(p => p !== null) as Product[]
                 )
             );
@@ -142,15 +162,15 @@ export async function getProductsByCategoryId(categoryId: string, excludeProduct
   console.log(`[FirestoreService] getProductsByCategoryId: Attempting to read from collection: '${collectionPath}' for category '${categoryId}'.`);
   try {
     const productsRef = collection(db, collectionPath);
-    let q = query(productsRef, where('category', '==', categoryId), limit(count + (excludeProductId ? 1 : 0) )); 
-    
+    let q = query(productsRef, where('category', '==', categoryId), limit(count + (excludeProductId ? 1 : 0) ));
+
     const querySnapshot = await getDocs(q);
     let products = querySnapshot.docs.map(docSnap => fromFirestore<Product>(docSnap)).filter(p => p !== null) as Product[];
-    
+
     if (excludeProductId) {
       products = products.filter(p => p.id !== excludeProductId);
     }
-    
+
     return products.slice(0, count);
   } catch (error)
 {
@@ -198,14 +218,16 @@ export async function addProduct(productData: Omit<Product, 'id' | 'rating' | 'r
   try {
     const dataWithTimestamp = {
       ...productData,
-      createdAt: serverTimestamp(), 
+      createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
     const docRef = await addDoc(collection(db, collectionPath), dataWithTimestamp);
-    return { id: docRef.id, ...productData, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as Product; 
+    // For optimistic update, we create a client-side version of the product
+    // Timestamps will be resolved by Firestore, but we can approximate for immediate UI.
+    return { id: docRef.id, ...productData, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as Product;
   } catch (error) {
     console.error(`[FirestoreService] addProduct: Error adding product to Firestore collection '${collectionPath}':`, error);
-    return null;
+    throw error; // Re-throw to be caught by server action
   }
 }
 
@@ -218,7 +240,7 @@ export async function updateProduct(productId: string, productData: Partial<Omit
     return true;
   } catch (error) {
     console.error(`[FirestoreService] updateProduct: Error updating product with ID ${productId} in '${docPath}':`, error);
-    return false;
+    throw error; // Re-throw to be caught by server action
   }
 }
 
@@ -231,7 +253,7 @@ export async function deleteProduct(productId: string): Promise<boolean> {
     return true;
   } catch (error) {
     console.error(`[FirestoreService] deleteProduct: Error deleting product with ID ${productId} from '${docPath}':`, error);
-    return false;
+    throw error; // Re-throw to be caught by server action
   }
 }
 
@@ -240,7 +262,7 @@ export async function getOrders(count?: number): Promise<Order[]> {
   console.log(`[FirestoreService] getOrders: Attempting to read from collection: '${collectionPath}'.`);
   try {
     const ordersRef = collection(db, collectionPath);
-    const q = count ? query(ordersRef, limit(count)) : query(ordersRef); 
+    const q = count ? query(ordersRef, orderBy("orderDate", "desc"), limit(count)) : query(ordersRef, orderBy("orderDate", "desc"));
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(docSnap => fromFirestore<Order>(docSnap)).filter(o => o !== null) as Order[];
   } catch (error) {
@@ -267,7 +289,7 @@ export async function getOrdersByUserId(userId: string): Promise<Order[]> {
   console.log(`[FirestoreService] getOrdersByUserId: Attempting to read from collection: '${collectionPath}' for userId: ${userId}.`);
   try {
     const ordersRef = collection(db, collectionPath);
-    const q = query(ordersRef, where('userId', '==', userId));
+    const q = query(ordersRef, where('userId', '==', userId), orderBy("orderDate", "desc"));
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(docSnap => fromFirestore<Order>(docSnap)).filter(o => o !== null) as Order[];
   } catch (error) {
@@ -276,26 +298,31 @@ export async function getOrdersByUserId(userId: string): Promise<Order[]> {
   }
 }
 
-export async function updateOrderStatus(orderId: string, status: OrderStatus): Promise<void> {
+// Note: updateOrderStatus is now primarily handled by server action using Admin SDK for permissions.
+// This client-side version might be useful for optimistic updates if rules allowed user to update their own order status, but that's not the case here.
+// For now, it's effectively replaced by the server action. I'll keep it commented for reference.
+/*
+export async function updateOrderStatusInFirestore(orderId: string, status: OrderStatus): Promise<boolean> {
   const docPath = `${ORDERS_COLLECTION}/${orderId}`;
   const dataToUpdate = { status: status, updatedAt: serverTimestamp() };
-  console.log(`[FirestoreService] updateOrderStatus: Attempting to update status for order: '${docPath}' to '${status}'. Data:`, dataToUpdate);
+  console.log(`[FirestoreService] updateOrderStatusInFirestore (Client SDK): Attempting to update status for order: '${docPath}' to '${status}'.`);
   try {
     const docRef = doc(db, ORDERS_COLLECTION, orderId);
     await updateDoc(docRef, dataToUpdate);
-    console.log(`[FirestoreService] updateOrderStatus: Successfully updated status for order ${orderId}.`);
-    // No explicit return true needed, success is implied if no error is thrown
-  } catch (error: any) { 
-    console.error(`[FirestoreService] updateOrderStatus: Firebase error updating status for order ${orderId} in '${docPath}'.`);
-    if (error.code) { 
+    console.log(`[FirestoreService] updateOrderStatusInFirestore (Client SDK): Successfully updated status for order ${orderId}.`);
+    return true;
+  } catch (error: any) {
+    console.error(`[FirestoreService] updateOrderStatusInFirestore (Client SDK): Firebase error updating status for order ${orderId}.`);
+    if (error.code) {
       console.error(`Firebase Error Code: ${error.code}, Message: ${error.message}`);
-    } else { 
+    } else {
       console.error(`General Error: ${error.message}`, error);
     }
     console.error("Full error object from Firebase:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
-    throw error; // Re-throw the error to be caught by the server action
+    throw error; // Re-throw to be caught by the server action or calling function
   }
 }
+*/
 
 export async function addUserProfile(uid: string, email: string, displayName?: string | null): Promise<boolean> {
   const docPath = `${USERS_COLLECTION}/${uid}`;
@@ -305,7 +332,7 @@ export async function addUserProfile(uid: string, email: string, displayName?: s
       email: email,
       displayName: displayName || null,
       createdAt: serverTimestamp(),
-      firstName: null, // Initialize optional fields
+      firstName: null,
       lastName: null,
       phone: null,
       photoURL: null,
@@ -325,12 +352,11 @@ export async function addUserProfileByAdmin(profileData: Omit<UserProfile, 'id' 
     const dataWithTimestamp = {
       ...profileData,
       createdAt: serverTimestamp(),
-      // Ensure all optional fields from UserProfile are explicitly set or null
       displayName: profileData.displayName || null,
       firstName: profileData.firstName || null,
       lastName: profileData.lastName || null,
       phone: profileData.phone || null,
-      photoURL: null, 
+      photoURL: null,
     };
     const docRef = await addDoc(collection(db, collectionPath), dataWithTimestamp);
     const newDocSnap = await getDoc(docRef);
@@ -368,5 +394,138 @@ export async function getUserById(userId: string): Promise<UserProfile | null> {
   } catch (error) {
     console.error(`[FirestoreService] getUserById: Error fetching user with ID ${userId} from '${docPath}':`, error);
     return null;
+  }
+}
+
+// Cart Firestore Functions
+export async function getUserCart(userId: string): Promise<UserCartDocument | null> {
+  if (!userId) return null;
+  const docRef = doc(db, CARTS_COLLECTION, userId);
+  const docSnap = await getDoc(docRef);
+  if (docSnap.exists()) {
+    return fromFirestore<UserCartDocument>(docSnap);
+  }
+  // If cart doesn't exist, create an empty one
+  const newCart: UserCartDocument = { userId, items: [], lastUpdatedAt: serverTimestamp() };
+  await setDoc(docRef, newCart);
+  return { ...newCart, lastUpdatedAt: new Date().toISOString() }; // Return with resolved timestamp for consistency
+}
+
+export async function addItemToCart(userId: string, item: UserCartItem): Promise<void> {
+  if (!userId) throw new Error("User ID is required to add item to cart.");
+  const cartRef = doc(db, CARTS_COLLECTION, userId);
+  // Check if item already exists, if so, update quantity, otherwise add new item
+  // This simplified version just adds or updates, assuming quantity handling is done before calling
+  await updateDoc(cartRef, {
+    items: arrayUnion(item), // This will add if not present based on object equality (might not work as expected for updates)
+    lastUpdatedAt: serverTimestamp(),
+  });
+   // A more robust way would be to read, modify, write or use transactions for quantity updates.
+   // For simplicity, we'll handle quantity logic in the context for now and fetchAndPopulate.
+}
+
+export async function updateCartItemQuantity(userId: string, productId: string, newQuantity: number): Promise<void> {
+  if (!userId) throw new Error("User ID is required.");
+  const cartRef = doc(db, CARTS_COLLECTION, userId);
+  await runTransaction(db, async (transaction) => {
+    const cartDoc = await transaction.get(cartRef);
+    if (!cartDoc.exists()) {
+      // Create cart if it doesn't exist (though getUserCart should handle this)
+      transaction.set(cartRef, { userId, items: [{ productId, quantity: newQuantity, addedAt: serverTimestamp() }], lastUpdatedAt: serverTimestamp() });
+      return;
+    }
+    const items = (cartDoc.data()?.items as UserCartItem[]) || [];
+    const itemIndex = items.findIndex(item => item.productId === productId);
+    if (itemIndex > -1) {
+      items[itemIndex].quantity = newQuantity;
+    } else if (newQuantity > 0) { // Add if not found and quantity is positive
+      items.push({ productId, quantity: newQuantity, addedAt: serverTimestamp() });
+    }
+    const updatedItems = items.filter(item => item.quantity > 0); // Remove if quantity is 0
+    transaction.update(cartRef, { items: updatedItems, lastUpdatedAt: serverTimestamp() });
+  });
+}
+
+export async function removeItemFromCart(userId: string, productId: string): Promise<void> {
+  if (!userId) throw new Error("User ID is required.");
+  const cartRef = doc(db, CARTS_COLLECTION, userId);
+   await runTransaction(db, async (transaction) => {
+    const cartDoc = await transaction.get(cartRef);
+    if (!cartDoc.exists()) return;
+    const items = (cartDoc.data()?.items as UserCartItem[]) || [];
+    const updatedItems = items.filter(item => item.productId !== productId);
+    transaction.update(cartRef, { items: updatedItems, lastUpdatedAt: serverTimestamp() });
+  });
+}
+
+export async function clearUserCart(userId: string): Promise<void> {
+  if (!userId) throw new Error("User ID is required.");
+  const cartRef = doc(db, CARTS_COLLECTION, userId);
+  await updateDoc(cartRef, {
+    items: [],
+    lastUpdatedAt: serverTimestamp(),
+  });
+}
+
+
+// Wishlist Firestore Functions
+export async function getUserWishlist(userId: string): Promise<UserWishlistDocument | null> {
+  if (!userId) return null;
+  const docRef = doc(db, WISHLISTS_COLLECTION, userId);
+  const docSnap = await getDoc(docRef);
+  if (docSnap.exists()) {
+    return fromFirestore<UserWishlistDocument>(docSnap);
+  }
+  // If wishlist doesn't exist, create an empty one
+  const newWishlist: UserWishlistDocument = { userId, productIds: [], lastUpdatedAt: serverTimestamp() };
+  await setDoc(docRef, newWishlist);
+  return { ...newWishlist, lastUpdatedAt: new Date().toISOString() };
+}
+
+export async function addProductToWishlist(userId: string, productId: string): Promise<void> {
+  if (!userId) throw new Error("User ID is required.");
+  const wishlistRef = doc(db, WISHLISTS_COLLECTION, userId);
+  await updateDoc(wishlistRef, {
+    productIds: arrayUnion(productId),
+    lastUpdatedAt: serverTimestamp(),
+  });
+}
+
+export async function removeProductFromWishlist(userId: string, productId: string): Promise<void> {
+  if (!userId) throw new Error("User ID is required.");
+  const wishlistRef = doc(db, WISHLISTS_COLLECTION, userId);
+  await updateDoc(wishlistRef, {
+    productIds: arrayRemove(productId),
+    lastUpdatedAt: serverTimestamp(),
+  });
+}
+
+// Stock Update Function with Transaction
+export async function runStockUpdateTransaction(orderItems: { productId: string; quantity: number }[]): Promise<void> {
+  console.log("[FirestoreService] runStockUpdateTransaction: Starting for order items:", orderItems);
+  try {
+    await runTransaction(db, async (transaction) => {
+      for (const item of orderItems) {
+        const productRef = doc(db, PRODUCTS_COLLECTION, item.productId);
+        const productDoc = await transaction.get(productRef);
+
+        if (!productDoc.exists()) {
+          throw new Error(`Product with ID ${item.productId} not found.`);
+        }
+
+        const currentStock = productDoc.data().stock as number;
+        if (currentStock < item.quantity) {
+          throw new Error(`Insufficient stock for product ${item.productId}. Available: ${currentStock}, Requested: ${item.quantity}`);
+        }
+
+        const newStock = currentStock - item.quantity;
+        transaction.update(productRef, { stock: newStock, updatedAt: serverTimestamp() });
+        console.log(`[FirestoreService] runStockUpdateTransaction: Product ${item.productId} stock updated from ${currentStock} to ${newStock}.`);
+      }
+    });
+    console.log("[FirestoreService] runStockUpdateTransaction: Transaction committed successfully.");
+  } catch (error) {
+    console.error("[FirestoreService] runStockUpdateTransaction: Transaction failed:", error);
+    throw error; // Re-throw to be handled by the server action
   }
 }

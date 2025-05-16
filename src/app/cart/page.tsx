@@ -2,21 +2,39 @@
 'use client';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useCart, type CartItem } from '@/contexts/CartContext';
+import { useCart, type DisplayCartItem } from '@/contexts/CartContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
-import { Minus, Plus, Trash2, ShoppingBag } from 'lucide-react';
+import { Minus, Plus, Trash2, ShoppingBag, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function CartPage() {
-  const { cart, removeFromCart, updateQuantity, totalItems, totalPrice, clearCart } = useCart();
+  const { cart, removeFromCart, updateQuantity, totalItems, totalPrice, clearCart, loadingCart } = useCart();
 
-  const handleQuantityChange = (productId: string, newQuantity: number) => {
+  const handleQuantityChange = async (productId: string, newQuantity: number) => {
     if (newQuantity >= 0) {
-      updateQuantity(productId, newQuantity);
+      await updateQuantity(productId, newQuantity);
     }
   };
+
+  const handleRemoveFromCart = async (productId: string) => {
+    await removeFromCart(productId);
+  };
+
+  const handleClearCart = async () => {
+    await clearCart();
+  };
+
+  if (loadingCart) {
+    return (
+      <div className="py-8 text-center flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+        <h1 className="text-2xl font-bold font-serif">Loading Your Cart</h1>
+        <p className="text-muted-foreground">Please wait a moment...</p>
+      </div>
+    );
+  }
 
   if (cart.length === 0) {
     return (
@@ -45,7 +63,7 @@ export default function CartPage() {
       <div className="grid lg:grid-cols-3 gap-8 items-start">
         {/* Cart Items */}
         <div className="lg:col-span-2 space-y-6">
-          {cart.map((item: CartItem) => (
+          {cart.map((item: DisplayCartItem) => (
             <Card key={item.id} className="flex flex-col sm:flex-row items-center p-4 gap-4 shadow-md rounded-lg">
               <Link href={`/products/${item.id}`} className="shrink-0">
                 <Image
@@ -54,6 +72,7 @@ export default function CartPage() {
                   width={100}
                   height={120}
                   className="rounded-md object-cover aspect-[5/6]"
+                  data-ai-hint={item.dataAiHint || 'product'}
                 />
               </Link>
               <div className="flex-grow">
@@ -67,24 +86,26 @@ export default function CartPage() {
                 <Button
                   variant="outline"
                   size="icon"
-                  onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
-                  disabled={item.quantity <= 1}
+                  onClick={() => handleQuantityChange(item.id, item.quantityInCart - 1)}
+                  disabled={item.quantityInCart <= 1 || loadingCart}
                   className="h-8 w-8"
                 >
                   <Minus className="h-4 w-4" />
                 </Button>
                 <Input
                   type="number"
-                  value={item.quantity}
+                  value={item.quantityInCart}
                   onChange={(e) => handleQuantityChange(item.id, parseInt(e.target.value))}
                   min="1"
                   className="w-16 h-8 text-center"
+                  disabled={loadingCart}
                 />
                 <Button
                   variant="outline"
                   size="icon"
-                  onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
+                  onClick={() => handleQuantityChange(item.id, item.quantityInCart + 1)}
                   className="h-8 w-8"
+                  disabled={loadingCart || item.quantityInCart >= item.stock }
                 >
                   <Plus className="h-4 w-4" />
                 </Button>
@@ -92,8 +113,9 @@ export default function CartPage() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => removeFromCart(item.id)}
+                onClick={() => handleRemoveFromCart(item.id)}
                 className="text-muted-foreground hover:text-destructive"
+                disabled={loadingCart}
               >
                 <Trash2 className="h-5 w-5" />
               </Button>
@@ -101,7 +123,7 @@ export default function CartPage() {
           ))}
            {cart.length > 0 && (
             <div className="text-right mt-4">
-              <Button variant="outline" onClick={clearCart} className="text-destructive border-destructive hover:bg-destructive/10">
+              <Button variant="outline" onClick={handleClearCart} className="text-destructive border-destructive hover:bg-destructive/10" disabled={loadingCart}>
                 <Trash2 className="mr-2 h-4 w-4" /> Clear Cart
               </Button>
             </div>
@@ -134,7 +156,7 @@ export default function CartPage() {
           </CardContent>
           <CardFooter className="p-0 pt-6">
             <Link href="/checkout" className="w-full">
-              <Button size="lg" className="w-full text-lg">
+              <Button size="lg" className="w-full text-lg" disabled={cart.length === 0 || loadingCart}>
                 Proceed to Checkout
               </Button>
             </Link>

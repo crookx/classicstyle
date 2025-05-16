@@ -7,7 +7,7 @@ export interface ProductColor {
 export interface Product {
   id: string; // Firestore document ID
   name: string;
-  price: number; 
+  price: number;
   originalPrice?: number | null;
   imageUrl: string;
   dataAiHint?: string | null;
@@ -22,6 +22,7 @@ export interface Product {
   tags?: string[] | null;
   sku?: string | null;
   isFeatured?: boolean | null;
+  stock: number; // Added for inventory management
   createdAt?: any; // Firestore Timestamp
   updatedAt?: any; // Firestore Timestamp
 }
@@ -34,8 +35,8 @@ export interface Collection {
   imageUrl: string;
   dataAiHint?: string | null;
   productIds: string[];
-  createdAt?: any; 
-  updatedAt?: any; 
+  createdAt?: any;
+  updatedAt?: any;
 }
 
 export interface OrderItem {
@@ -63,8 +64,8 @@ export interface Order {
     postalCode: string;
     country: string;
   } | null;
-  createdAt?: any; 
-  updatedAt?: any; 
+  createdAt?: any;
+  updatedAt?: any;
 }
 
 export interface UserProfile {
@@ -73,8 +74,38 @@ export interface UserProfile {
   displayName?: string | null;
   photoURL?: string | null;
   createdAt: any; // Firestore Timestamp
-  // Add other profile fields as needed, e.g., role, address, phone
   firstName?: string | null;
   lastName?: string | null;
   phone?: string | null;
+}
+
+// Types for Firestore-backed Cart
+export interface UserCartItem {
+  productId: string;
+  quantity: number;
+  addedAt: any; // Firestore Timestamp
+  // Note: Full product details are fetched separately for display
+}
+
+export interface UserCartDocument {
+  userId: string; // Should match the document ID for /carts/{userId}
+  items: UserCartItem[];
+  lastUpdatedAt: any; // Firestore Timestamp
+}
+
+// Types for Firestore-backed Wishlist
+export interface UserWishlistItem {
+  productId: string;
+  addedAt: any; // Firestore Timestamp
+}
+export interface UserWishlistDocument {
+  userId: string; // Should match the document ID for /wishlists/{userId}
+  productIds: string[]; // Storing only product IDs
+  lastUpdatedAt: any; // Firestore Timestamp
+}
+
+// For CartContext display, combining UserCartItem with full Product details
+export interface DisplayCartItem extends Product {
+  quantityInCart: number; // Renamed from 'quantity' to avoid clash with Product.stock
+  addedAt: any;
 }

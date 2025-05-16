@@ -1,6 +1,6 @@
 
 import Image from 'next/image';
-import { Button } from '@/components/ui/button';
+// import { Button } from '@/components/ui/button'; // No longer directly used
 import { Heart, ShoppingCart, Star, CheckCircle, ShieldCheck } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import ProductGrid from '@/components/product/ProductGrid';
@@ -13,24 +13,51 @@ import {
 } from "@/components/ui/accordion";
 import { getProductById, getProductsByCategoryId } from '@/lib/firebase/firestoreService';
 import type { Product } from '@/types';
-import AddToCartButton from './AddToCartButton'; 
-import WishlistToggleButton from './WishlistToggleButton'; 
+import AddToCartButton from './AddToCartButton';
+import WishlistToggleButton from './WishlistToggleButton';
 import { notFound } from 'next/navigation';
+import type { Metadata, ResolvingMetadata } from 'next';
 
 interface ProductDetailPageProps {
   params: { productId: string };
 }
+
+export async function generateMetadata(
+  { params }: ProductDetailPageProps,
+  parent: ResolvingMetadata
+): Promise<Metadata> {
+  const id = params.productId;
+  const product = await getProductById(id);
+
+  if (!product) {
+    return {
+      title: 'Product Not Found - ClassicStyle eStore',
+      description: 'The product you are looking for could not be found.',
+    };
+  }
+
+  return {
+    title: `${product.name} - ClassicStyle eStore`,
+    description: product.description.substring(0, 160) || `Shop ${product.name} at ClassicStyle eStore.`, // Truncate description for meta
+    openGraph: {
+      title: product.name,
+      description: product.description.substring(0, 160),
+      images: product.imageUrl ? [{ url: product.imageUrl }] : [],
+    },
+  };
+}
+
 
 export default async function ProductDetailPage({ params }: ProductDetailPageProps) {
   const productId = params.productId;
   const product = await getProductById(productId);
 
   if (!product) {
-    notFound(); 
+    notFound();
   }
 
-  const relatedProducts = product.category 
-    ? await getProductsByCategoryId(product.category, product.id, 4) 
+  const relatedProducts = product.category
+    ? await getProductsByCategoryId(product.category, product.id, 4)
     : [];
 
   return (
@@ -50,7 +77,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
 
         <div className="space-y-6">
           <h1 className="text-4xl font-bold font-serif">{product.name}</h1>
-          
+
           {product.rating && typeof product.rating === 'number' && (
             <div className="flex items-center">
               {[...Array(5)].map((_, i) => (
@@ -66,8 +93,15 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
               <span className="ml-3 text-xl text-muted-foreground line-through">KSh {product.originalPrice.toFixed(2)}</span>
             )}
           </p>
-          
           <p className="text-base text-foreground/80 leading-relaxed">{product.description}</p>
+
+           {product.stock !== undefined && product.stock > 0 && (
+             <p className="text-sm text-green-600 font-medium">In Stock ({product.stock} available)</p>
+           )}
+           {product.stock !== undefined && product.stock === 0 && (
+              <p className="text-sm text-destructive font-medium">Out of Stock</p>
+           )}
+
 
           {product.colors && product.colors.length > 0 && (
             <div>
@@ -94,7 +128,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
               </div>
             </div>
           )}
-          
+
           <Separator />
 
           <div className="flex flex-col sm:flex-row gap-4">
@@ -125,7 +159,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
           </Accordion>
         </div>
       </div>
-      
+
       <Tabs defaultValue="description" className="w-full mt-16">
         <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 mb-6">
           <TabsTrigger value="description">Full Description</TabsTrigger>

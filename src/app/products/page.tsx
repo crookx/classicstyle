@@ -15,6 +15,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Filter } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton'; // For loading state
+import type { Metadata } from 'next';
+
+// Basic metadata for SEO - this will be static for this page.
+// For dynamic metadata on product pages, use generateMetadata.
+// export const metadata: Metadata = {
+//   title: 'All Products - ClassicStyle eStore',
+//   description: 'Explore our curated selection of classic pieces. Shop for men, women, and kids.',
+// };
+// ^ Metadata cannot be exported from client components. It should be in layout.tsx or page.tsx if it's a server component.
 
 export default function ProductsPage() {
   const [allProducts, setAllProducts] = useState<Product[]>([]);
@@ -23,8 +32,8 @@ export default function ProductsPage() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 500]); // Default, will update
-  const [maxPossiblePrice, setMaxPossiblePrice] = useState(500);
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 50000]); // Increased default max for KES
+  const [maxPossiblePrice, setMaxPossiblePrice] = useState(50000);
   const [sortBy, setSortBy] = useState('featured');
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [allAvailableCategories, setAllAvailableCategories] = useState<string[]>([]);
@@ -34,15 +43,16 @@ export default function ProductsPage() {
       setIsLoading(true);
       const productsFromDB = await fetchProductsFromDB();
       setAllProducts(productsFromDB);
-      setFilteredProducts(productsFromDB); // Initially show all
+      setFilteredProducts(productsFromDB);
 
       if (productsFromDB.length > 0) {
         const categories = Array.from(new Set(productsFromDB.map(p => p.category).filter(Boolean))) as string[];
         setAllAvailableCategories(categories);
-        
+
         const maxPriceFromData = Math.max(...productsFromDB.map(p => p.price), 0);
-        setMaxPossiblePrice(maxPriceFromData > 0 ? maxPriceFromData : 500);
-        setPriceRange([0, maxPriceFromData > 0 ? maxPriceFromData : 500]);
+        const effectiveMaxPrice = maxPriceFromData > 0 ? maxPriceFromData : 50000;
+        setMaxPossiblePrice(effectiveMaxPrice);
+        setPriceRange([0, effectiveMaxPrice]);
       }
       setIsLoading(false);
     }
@@ -135,18 +145,18 @@ export default function ProductsPage() {
           </div>
         )}
         <div>
-          <h3 className="text-base font-medium mb-2">Price Range</h3>
+          <h3 className="text-base font-medium mb-2">Price Range (KSh)</h3>
           <Slider
             min={0}
             max={maxPossiblePrice}
-            step={1} // More granular for KES-like values
+            step={100} // More granular for KES-like values
             value={priceRange}
             onValueChange={(value) => setPriceRange(value as [number, number])}
             className="mt-1"
           />
           <div className="flex justify-between text-sm text-muted-foreground mt-2">
-            <span>${priceRange[0]}</span>
-            <span>${priceRange[1]}</span>
+            <span>KSh {priceRange[0]}</span>
+            <span>KSh {priceRange[1]}</span>
           </div>
         </div>
         <Button onClick={clearAllFilters} variant="outline" className="w-full">
@@ -155,7 +165,7 @@ export default function ProductsPage() {
       </CardContent>
     </Card>
   );
-  
+
   if (isLoading) {
     return (
       <div className="py-8">
@@ -207,7 +217,7 @@ export default function ProductsPage() {
         <main className="flex-1">
           <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
             <p className="text-sm text-muted-foreground">{filteredProducts.length} products found</p>
-            
+
             <div className="md:hidden">
               <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
                 <SheetTrigger asChild>

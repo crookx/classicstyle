@@ -1,51 +1,123 @@
+
 'use client';
-import type { Product } from '@/types';
-import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import type { Product, UserWishlistItem, UserWishlistDocument } from '@/types';
+import React, { createContext, useContext, useState, useEffect, type ReactNode, useCallback } from 'react';
+import { useAuth } from './AuthContext';
+import {
+  getUserWishlist as fetchUserWishlistFromDb,
+  addProductToWishlist as addProductToWishlistInDb,
+  removeProductFromWishlist as removeProductFromWishlistInDb,
+  getProductsByIds
+} from '@/lib/firebase/firestoreService';
+import { serverTimestamp } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
+import { useRouter } from 'next/navigation';
 
 interface WishlistContextType {
-  wishlist: Product[];
-  addToWishlist: (product: Product) => void;
-  removeFromWishlist: (productId: string) => void;
+  wishlist: Product[]; // Products with full details for display
+  loadingWishlist: boolean;
+  addToWishlist: (product: Product) => Promise<void>;
+  removeFromWishlist: (productId: string) => Promise<void>;
   isInWishlist: (productId: string) => boolean;
+  clearWishlistLocal: () => void; // For logout
 }
 
 const WishlistContext = createContext<WishlistContextType | undefined>(undefined);
 
-const WISHLIST_STORAGE_KEY = 'classicstyle_wishlist';
-
 export const WishlistProvider = ({ children }: { children: ReactNode }) => {
-  const [wishlist, setWishlist] = useState<Product[]>([]);
+  const { currentUser, loading: authLoading } = useAuth();
+  const { toast } = useToast();
+  const router = useRouter();
 
-  useEffect(() => {
-    const storedWishlist = localStorage.getItem(WISHLIST_STORAGE_KEY);
-    if (storedWishlist) {
-      setWishlist(JSON.parse(storedWishlist));
-    }
+  const [wishlist, setWishlist] = useState<Product[]>([]); // For UI display
+  const [dbWishlistProductIds, setDbWishlistProductIds] = useState<string[]>([]);
+  const [loadingWishlist, setLoadingWishlist] = useState(true);
+
+  const clearWishlistLocal = useCallback(() => {
+    setWishlist([]);
+    setDbWishlistProductIds([]);
   }, []);
 
-  useEffect(() => {
-    localStorage.setItem(WISHLIST_STORAGE_KEY, JSON.stringify(wishlist));
-  }, [wishlist]);
+  const fetchAndPopulateWishlist = useCallback(async (userId: string) => {
+    setLoadingWishlist(true);
+    try {
+      const userWishlistDoc = await fetchUserWishlistFromDb(userId);
+      const currentProductIds = userWishlistDoc?.productIds || [];
+      setDbWishlistProductIds(currentProductIds);
 
-  const addToWishlist = (product: Product) => {
-    setWishlist((prevWishlist) => {
-      if (!prevWishlist.find(item => item.id === product.id)) {
-        return [...prevWishlist, product];
+      if (currentProductIds.length > 0) {
+        const productsDetails = await getProductsByIds(currentProductIds);
+        setWishlist(productsDetails.filter(p => p !== null) as Product[]);
+      } else {
+        setWishlist([]);
       }
-      return prevWishlist;
-    });
+    } catch (error) {
+      console.error("Error fetching or populating wishlist:", error);
+      toast({ title: "Error", description: "Could not load your wishlist.", variant: "destructive" });
+      setWishlist([]);
+      setDbWishlistProductIds([]);
+    } finally {
+      setLoadingWishlist(false);
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    if (!authLoading && currentUser) {
+      fetchAndPopulateWishlist(currentUser.uid);
+    } else if (!authLoading && !currentUser) {
+      clearWishlistLocal();
+      setLoadingWishlist(false);
+    }
+  }, [currentUser, authLoading, fetchAndPopulateWishlist, clearWishlistLocal]);
+
+
+  const checkAuthAndPrompt = () => {
+    if (authLoading) {
+      toast({ title: "Please wait", description: "Authenticating..." });
+      return false;
+    }
+    if (!currentUser) {
+      toast({
+        title: "Login Required",
+        description: "Please log in to manage your wishlist.",
+        variant: "destructive",
+        action: (
+          <button onClick={() => router.push('/login?redirect=/wishlist')} className="ml-auto rounded-md border bg-background px-3 py-1.5 text-sm hover:bg-accent">
+            Login
+          </button>
+        ),
+      });
+      return false;
+    }
+    return true;
   };
 
-  const removeFromWishlist = (productId: string) => {
-    setWishlist((prevWishlist) => prevWishlist.filter(item => item.id !== productId));
+  const addToWishlist = async (product: Product) => {
+    if (!checkAuthAndPrompt() || !currentUser) return;
+    if (dbWishlistProductIds.includes(product.id)) return; // Already in wishlist
+
+    await addProductToWishlistInDb(currentUser.uid, product.id);
+    // Optimistically update UI, then refetch
+    setDbWishlistProductIds(prev => [...prev, product.id]);
+    setWishlist(prev => [...prev, product]); // Add full product for immediate display
+    await fetchAndPopulateWishlist(currentUser.uid); // Re-fetch for consistency
+  };
+
+  const removeFromWishlist = async (productId: string) => {
+    if (!checkAuthAndPrompt() || !currentUser) return;
+    await removeProductFromWishlistInDb(currentUser.uid, productId);
+    // Optimistically update UI, then refetch
+    setDbWishlistProductIds(prev => prev.filter(id => id !== productId));
+    setWishlist(prev => prev.filter(p => p.id !== productId));
+    await fetchAndPopulateWishlist(currentUser.uid); // Re-fetch for consistency
   };
 
   const isInWishlist = (productId: string) => {
-    return wishlist.some(item => item.id === productId);
+    return dbWishlistProductIds.includes(productId);
   };
 
   return (
-    <WishlistContext.Provider value={{ wishlist, addToWishlist, removeFromWishlist, isInWishlist }}>
+    <WishlistContext.Provider value={{ wishlist, loadingWishlist, addToWishlist, removeFromWishlist, isInWishlist, clearWishlistLocal }}>
       {children}
     </WishlistContext.Provider>
   );

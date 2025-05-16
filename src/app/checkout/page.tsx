@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { useCart, type CartItem } from '@/contexts/CartContext';
+import { useCart, type DisplayCartItem } from '@/contexts/CartContext'; // Updated type
 import Image from 'next/image';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
@@ -18,6 +18,9 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import type { User } from 'firebase/auth';
+import { decrementStockForOrderAction } from '@/lib/actions/orderActions'; // New action for stock
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore'; // For creating order
+import { db } from '@/lib/firebase'; // For creating order
 
 const shippingSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -44,7 +47,7 @@ interface OrderDetailsForEmail {
   orderNumber: string;
   customerName: string;
   customerEmail: string;
-  items: CartItem[];
+  items: DisplayCartItem[]; // Updated to use DisplayCartItem for email
   totalAmount: number;
   shippingAddress: {
     firstName: string;
@@ -55,30 +58,13 @@ interface OrderDetailsForEmail {
     country: string;
     postalCode: string;
   };
-  estimatedDelivery?: string; 
+  estimatedDelivery?: string;
 }
 
-// Placeholder function to simulate initiating an order confirmation email process
-// In a real app, this would likely call a backend API (e.g., a Firebase Cloud Function).
 async function initiateOrderConfirmationEmail(orderDetails: OrderDetailsForEmail) {
   console.log('--- SIMULATING INITIATION OF ORDER CONFIRMATION EMAIL ---');
-  console.log('Order Details Prepared:', orderDetails);
-  console.log('Next Step: Call a backend API/Cloud Function to process and send the actual email using an email service.');
-  // Example:
-  // try {
-  //   const response = await fetch('/api/send-order-confirmation', { // Your backend API endpoint
-  //     method: 'POST',
-  //     headers: { 'Content-Type': 'application/json' },
-  //     body: JSON.stringify(orderDetails),
-  //   });
-  //   if (!response.ok) {
-  //     console.error('Failed to trigger order confirmation email:', await response.text());
-  //   } else {
-  //     console.log('Order confirmation email trigger successful.');
-  //   }
-  // } catch (error) {
-  //   console.error('Error triggering order confirmation email:', error);
-  // }
+  console.log('Order Details Prepared:', JSON.stringify(orderDetails, null, 2));
+  console.log('Next Step: Call a backend API/Cloud Function (e.g., a Firebase Cloud Function listening to new orders) to process and send the actual email using an email service.');
   console.log('--- END OF ORDER CONFIRMATION SIMULATION ---');
 }
 
@@ -93,7 +79,7 @@ export default function CheckoutPage() {
   const form = useForm<z.infer<typeof checkoutSchema>>({
     resolver: zodResolver(checkoutSchema),
     defaultValues: {
-      email: currentUser?.email || '',
+      email: '', // Will be set from currentUser
       firstName: '',
       lastName: '',
       address: '',
@@ -114,55 +100,116 @@ export default function CheckoutPage() {
       toast({ title: "Authentication Required", description: "Please log in to proceed to checkout.", variant: "destructive" });
       router.push('/login?redirect=/checkout');
     }
-    if (currentUser && !form.getValues('email')) {
+    if (currentUser && !form.getValues('email')) { // Set email only if not already set (e.g. by user typing)
        form.setValue('email', currentUser.email || '');
     }
   }, [currentUser, authLoading, router, toast, form]);
 
   async function onSubmit(values: z.infer<typeof checkoutSchema>) {
+    if (!currentUser) {
+        toast({ title: "Error", description: "You must be logged in to place an order.", variant: "destructive" });
+        return;
+    }
     setIsSubmitting(true);
     console.log('Checkout submitted with form values:', values);
 
     // This is a mock order placement.
-    // In a real app, you would save the order to your database here.
-    // This saving action itself would trigger the onNewOrderSendConfirmationEmail Cloud Function.
-    const mockOrderNumber = `CS${Date.now().toString().slice(-6)}`;
+    // In a real app, you would integrate a payment gateway here.
+    // After successful payment, you save the order to your database.
 
-    const orderDetailsForEmail: OrderDetailsForEmail = {
-      orderNumber: mockOrderNumber,
-      customerName: `${values.firstName} ${values.lastName}`,
-      customerEmail: values.email,
-      items: cart, 
-      totalAmount: totalPrice,
-      shippingAddress: {
-        firstName: values.firstName,
-        lastName: values.lastName,
-        address: values.address,
-        apartment: values.apartment,
-        city: values.city,
-        country: values.country,
-        postalCode: values.postalCode,
-      },
-      estimatedDelivery: "3-5 business days (Kenya)",
+    const orderItemsForDb = cart.map(item => ({
+        productId: item.id,
+        name: item.name,
+        quantity: item.quantityInCart,
+        price: item.price,
+        imageUrl: item.imageUrl,
+    }));
+
+    const newOrderData = {
+        customerName: `${values.firstName} ${values.lastName}`,
+        customerEmail: values.email,
+        userId: currentUser.uid,
+        orderDate: serverTimestamp(), // Firestore server timestamp
+        totalAmount: totalPrice,
+        status: 'Pending' as const, // Initial status
+        items: orderItemsForDb,
+        shippingAddress: {
+            address: values.address,
+            city: values.city,
+            postalCode: values.postalCode,
+            country: values.country,
+            // apartment: values.apartment, // Add if needed
+        },
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
     };
 
-    // In a real application, saving the order to Firestore would trigger the
-    // onNewOrderSendConfirmationEmail Cloud Function automatically.
-    // This call here is just to simulate the data that *would* be available
-    // and what the frontend *might* do if it needed to directly initiate something (less common for this email).
-    await initiateOrderConfirmationEmail(orderDetailsForEmail);
+    try {
+        // 1. Save order to Firestore
+        const orderRef = await addDoc(collection(db, "orders"), newOrderData);
+        const mockOrderNumber = orderRef.id; // Use Firestore doc ID as order number
+        console.log("Order successfully created in Firestore with ID:", mockOrderNumber);
 
-    toast({
-      title: "Order Placed!",
-      description: `Thank you for your purchase, ${values.firstName}! Your order #${mockOrderNumber} is being processed. An order confirmation email process has been simulated (check console).`,
-    });
+        // 2. Decrement stock
+        const stockUpdateItems = cart.map(item => ({ productId: item.id, quantity: item.quantityInCart }));
+        const stockUpdateResult = await decrementStockForOrderAction(stockUpdateItems);
 
-    clearCart();
-    setIsSubmitting(false);
-    router.push('/');
+        if (!stockUpdateResult.success) {
+            console.error("Stock update failed:", stockUpdateResult.error);
+            // Decide on error handling: Rollback order? Notify admin?
+            // For now, we'll proceed but log the error.
+            toast({
+                title: "Order Placed (Stock Issue)",
+                description: `Your order #${mockOrderNumber} is placed, but there was an issue updating stock: ${stockUpdateResult.error}. We will resolve this.`,
+                variant: "destructive",
+                duration: 10000,
+            });
+        } else {
+            console.log("Stock updated successfully for order:", mockOrderNumber);
+        }
+
+        // 3. Prepare details for conceptual email
+        const orderDetailsForEmail: OrderDetailsForEmail = {
+            orderNumber: mockOrderNumber,
+            customerName: `${values.firstName} ${values.lastName}`,
+            customerEmail: values.email,
+            items: cart, // Pass DisplayCartItem array
+            totalAmount: totalPrice,
+            shippingAddress: {
+                firstName: values.firstName,
+                lastName: values.lastName,
+                address: values.address,
+                apartment: values.apartment,
+                city: values.city,
+                country: values.country,
+                postalCode: values.postalCode,
+            },
+            estimatedDelivery: "3-5 business days (Kenya)", // Placeholder
+        };
+
+        await initiateOrderConfirmationEmail(orderDetailsForEmail);
+
+        toast({
+            title: "Order Placed!",
+            description: `Thank you, ${values.firstName}! Your order #${mockOrderNumber} is being processed.`,
+        });
+
+        await clearCart(); // Clear Firestore cart
+        router.push('/');
+
+    } catch (error) {
+        console.error("Error placing order or updating stock:", error);
+        toast({
+            title: "Order Placement Failed",
+            description: "There was an error processing your order. Please try again or contact support.",
+            variant: "destructive",
+        });
+    } finally {
+        setIsSubmitting(false);
+    }
   }
 
-  if (authLoading) {
+  if (authLoading && !currentUser) { // Show loading only if auth is loading AND there's no user yet
     return (
       <div className="py-12 text-center flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
@@ -172,7 +219,7 @@ export default function CheckoutPage() {
     );
   }
 
-  if (!currentUser) {
+  if (!currentUser && !authLoading) { // Explicitly redirect if not logged in and auth is done loading
     return (
          <div className="py-12 text-center">
             <h1 className="text-xl font-bold">Redirecting to login...</h1>
@@ -180,7 +227,7 @@ export default function CheckoutPage() {
     )
   }
 
-  if (cart.length === 0) {
+  if (cart.length === 0 && currentUser) { // Only show empty cart message if user is logged in
     return (
          <div className="py-8 text-center">
             <h1 className="text-3xl font-bold font-serif mb-4">Your Cart is Empty</h1>
@@ -234,9 +281,10 @@ export default function CheckoutPage() {
 
             <Card className="shadow-lg rounded-xl">
                 <CardHeader>
-                    <CardTitle className="text-2xl font-serif">Payment Details</CardTitle>
+                    <CardTitle className="text-2xl font-serif">Payment Details (Mock)</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                    <p className="text-sm text-muted-foreground">Payment integration is not yet live. These are placeholder fields.</p>
                     <FormField control={form.control} name="cardholderName" render={({ field }) => ( <FormItem><FormLabel>Name on Card</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
                     <FormField control={form.control} name="cardNumber" render={({ field }) => ( <FormItem><FormLabel>Card Number</FormLabel><FormControl><Input placeholder="•••• •••• •••• ••••" {...field} /></FormControl><FormMessage /></FormItem> )} />
                     <div className="grid sm:grid-cols-2 gap-4">
@@ -255,13 +303,13 @@ export default function CheckoutPage() {
               {cart.map(item => (
                 <div key={item.id} className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2">
-                    <Image src={item.imageUrl || 'https://placehold.co/40x50.png'} alt={item.name} width={40} height={50} className="rounded object-cover" />
+                    <Image src={item.imageUrl || 'https://placehold.co/40x50.png'} alt={item.name} width={40} height={50} className="rounded object-cover" data-ai-hint={item.dataAiHint || 'product'} />
                     <div>
                       <p className="font-medium line-clamp-1">{item.name}</p>
-                      <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
+                      <p className="text-xs text-muted-foreground">Qty: {item.quantityInCart}</p>
                     </div>
                   </div>
-                  <p>KSh {(item.price * item.quantity).toFixed(2)}</p>
+                  <p>KSh {(item.price * item.quantityInCart).toFixed(2)}</p>
                 </div>
               ))}
               <Separator />
@@ -284,12 +332,12 @@ export default function CheckoutPage() {
               </div>
             </CardContent>
             <CardFooter className="p-0 pt-6">
-              <Button type="submit" size="lg" className="w-full text-lg" disabled={form.formState.isSubmitting || isSubmitting}>
-                {(form.formState.isSubmitting || isSubmitting) ? (
+              <Button type="submit" size="lg" className="w-full text-lg" disabled={isSubmitting || cart.length === 0}>
+                {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Processing...
                   </>
-                ) : 'Place Order'}
+                ) : 'Place Order (Mock)'}
               </Button>
             </CardFooter>
           </Card>
@@ -298,6 +346,3 @@ export default function CheckoutPage() {
     </div>
   );
 }
-    
-
-    

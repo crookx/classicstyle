@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import type { Product, ProductColor } from '@/types';
-import { addProductAction, updateProductAction } from '@/lib/actions/productActions'; 
+import { addProductAction, updateProductAction } from '@/lib/actions/productActions';
 import { useRouter } from 'next/navigation';
 import { Checkbox } from '../ui/checkbox';
 import { useState } from 'react';
@@ -21,6 +21,7 @@ const productFormSchemaBase = z.object({
   name: z.string().min(3, { message: "Product name must be at least 3 characters." }),
   price: z.coerce.number().positive({ message: "Price must be a positive number." }),
   originalPrice: z.coerce.number().optional().transform(val => val || undefined), // Store as undefined if empty
+  stock: z.coerce.number().int().min(0, { message: "Stock must be a non-negative integer." }), // Added stock
   imageUrl: z.string().url({ message: "Please enter a valid image URL." }).or(z.literal('')),
   dataAiHint: z.string().optional(),
   category: z.string().min(2, { message: "Category is required." }),
@@ -38,7 +39,7 @@ const productFormSchemaBase = z.object({
 type ProductFormValues = z.infer<typeof productFormSchemaBase>;
 
 interface ProductFormProps {
-  productToEdit?: Product | null; 
+  productToEdit?: Product | null;
 }
 
 export default function ProductForm({ productToEdit }: ProductFormProps) {
@@ -52,6 +53,7 @@ export default function ProductForm({ productToEdit }: ProductFormProps) {
     name: productToEdit.name || '',
     price: productToEdit.price || 0,
     originalPrice: productToEdit.originalPrice || undefined,
+    stock: productToEdit.stock || 0, // Added stock
     imageUrl: productToEdit.imageUrl || '',
     dataAiHint: productToEdit.dataAiHint || '',
     category: productToEdit.category || '',
@@ -67,6 +69,7 @@ export default function ProductForm({ productToEdit }: ProductFormProps) {
     name: '',
     price: 0,
     originalPrice: undefined,
+    stock: 0, // Added stock
     imageUrl: '',
     dataAiHint: '',
     category: '',
@@ -79,7 +82,7 @@ export default function ProductForm({ productToEdit }: ProductFormProps) {
     sku: '',
     isFeatured: false,
   };
-  
+
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productFormSchemaBase),
     defaultValues: defaultValues,
@@ -87,12 +90,12 @@ export default function ProductForm({ productToEdit }: ProductFormProps) {
 
   async function onSubmit(data: ProductFormValues) {
     setIsSubmitting(true);
-    
+
     const submissionData = isEditMode && productToEdit ? { ...data, id: productToEdit.id } : data;
-    
+
     try {
-      const result = isEditMode 
-        ? await updateProductAction(submissionData) 
+      const result = isEditMode
+        ? await updateProductAction(submissionData)
         : await addProductAction(submissionData);
 
       if (result.success && result.data) {
@@ -100,7 +103,7 @@ export default function ProductForm({ productToEdit }: ProductFormProps) {
           title: isEditMode ? "Product Updated!" : "Product Added!",
           description: `${result.data.name} has been successfully ${isEditMode ? 'updated' : 'added'}.`,
         });
-        router.push('/admin/products'); 
+        router.push('/admin/products');
         router.refresh(); // Ensure the product list page re-fetches
       } else {
         toast({
@@ -109,7 +112,6 @@ export default function ProductForm({ productToEdit }: ProductFormProps) {
           variant: "destructive",
         });
          if (result.fieldErrors) {
-          // Optionally set form errors if using react-hook-form's error display
           Object.entries(result.fieldErrors).forEach(([field, errors]) => {
             if (errors && errors.length > 0) {
               form.setError(field as keyof ProductFormValues, { type: 'manual', message: errors.join(', ') });
@@ -145,15 +147,18 @@ export default function ProductForm({ productToEdit }: ProductFormProps) {
           <FormItem><FormLabel>Description</FormLabel><FormControl><Textarea placeholder="Detailed product description..." {...field} rows={4} /></FormControl><FormMessage /></FormItem>
         )} />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <FormField control={form.control} name="price" render={({ field }) => (
             <FormItem><FormLabel>Price (KSh)</FormLabel><FormControl><Input type="number" step="0.01" placeholder="e.g., 1500.00" {...field} /></FormControl><FormMessage /></FormItem>
           )} />
           <FormField control={form.control} name="originalPrice" render={({ field }) => (
             <FormItem><FormLabel>Original Price (KSh) (Optional)</FormLabel><FormControl><Input type="number" step="0.01" placeholder="e.g., 2000.00" {...field} value={field.value ?? ''} /></FormControl><FormDescription>If the product is on sale.</FormDescription><FormMessage /></FormItem>
           )} />
+           <FormField control={form.control} name="stock" render={({ field }) => (
+            <FormItem><FormLabel>Stock Quantity</FormLabel><FormControl><Input type="number" step="1" placeholder="e.g., 100" {...field} /></FormControl><FormMessage /></FormItem>
+          )} />
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormField control={form.control} name="category" render={({ field }) => (
             <FormItem><FormLabel>Category</FormLabel><FormControl><Input placeholder="e.g., Accessories" {...field} /></FormControl><FormMessage /></FormItem>
@@ -173,11 +178,11 @@ export default function ProductForm({ productToEdit }: ProductFormProps) {
         <FormField control={form.control} name="details" render={({ field }) => (
           <FormItem><FormLabel>Product Details (Optional)</FormLabel><FormControl><Textarea placeholder="100% Mulberry Silk\\nHand-rolled edges\\nMade in Kenya" {...field} rows={4} value={field.value ?? ''} /></FormControl><FormDescription>Enter each detail on a new line (use \\n for new lines).</FormDescription><FormMessage /></FormItem>
         )} />
-        
+
         <FormField control={form.control} name="colors" render={({ field }) => (
           <FormItem><FormLabel>Colors (Optional)</FormLabel><FormControl><Input placeholder="e.g., Ruby Red:#E0115F, Emerald Green:#50C878" {...field} value={field.value ?? ''} /></FormControl><FormDescription>Comma-separated, format: Name:HEX (e.g., Blue:#0000FF, Green:#00FF00).</FormDescription><FormMessage /></FormItem>
         )} />
-        
+
         <FormField control={form.control} name="sizes" render={({ field }) => (
           <FormItem><FormLabel>Sizes (Optional)</FormLabel><FormControl><Input placeholder="S, M, L, XL" {...field} value={field.value ?? ''} /></FormControl><FormDescription>Comma-separated values (e.g., S, M, L, 30W, 32W).</FormDescription><FormMessage /></FormItem>
         )} />
@@ -185,7 +190,7 @@ export default function ProductForm({ productToEdit }: ProductFormProps) {
         <FormField control={form.control} name="tags" render={({ field }) => (
           <FormItem><FormLabel>Tags (Optional)</FormLabel><FormControl><Input placeholder="e.g., silk, luxury, gift, featured" {...field} value={field.value ?? ''} /></FormControl><FormDescription>Comma-separated values.</FormDescription><FormMessage /></FormItem>
         )} />
-        
+
         <FormField
           control={form.control}
           name="isFeatured"

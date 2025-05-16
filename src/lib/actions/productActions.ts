@@ -10,6 +10,7 @@ const productFormSchemaBase = z.object({
   name: z.string().min(3, { message: "Product name must be at least 3 characters." }),
   price: z.coerce.number().positive({ message: "Price must be a positive number." }),
   originalPrice: z.coerce.number().optional().default(0).transform(val => val || null),
+  stock: z.coerce.number().int().min(0, { message: "Stock must be a non-negative integer." }), // Added stock
   imageUrl: z.string().url({ message: "Please enter a valid image URL." }).or(z.literal('')),
   dataAiHint: z.string().optional().transform(val => val || null),
   category: z.string().min(2, { message: "Category is required." }),
@@ -29,13 +30,13 @@ const productFormSchemaBase = z.object({
   isFeatured: z.boolean().default(false).optional(),
 });
 
-const AddProductSchema = productFormSchemaBase; // For adding, ID is not present
+const AddProductSchema = productFormSchemaBase;
 const UpdateProductSchema = productFormSchemaBase.extend({
   id: z.string().min(1, { message: "Product ID is required for updates." }),
 });
 
 
-interface ActionResult<T = Product> {
+interface ActionResult<T = Product | null> { // Allow T to be null for delete
   success: boolean;
   data?: T;
   error?: string;
@@ -49,16 +50,18 @@ export async function addProductAction(
 
   if (!validation.success) {
     console.error("Add Product Validation Error:", validation.error.flatten().fieldErrors);
-    return { 
-      success: false, 
+    return {
+      success: false,
       error: "Invalid product data.",
       fieldErrors: validation.error.flatten().fieldErrors,
     };
   }
 
   try {
+    // Ensure 'stock' is part of the data passed to Firestore
     const productDataForFirestore: Omit<Product, 'id' | 'rating' | 'reviewCount'> = {
       ...validation.data,
+      stock: validation.data.stock, // Explicitly include stock
     };
 
     const newProduct = await addProductToFirestore(productDataForFirestore);
@@ -88,17 +91,23 @@ export async function updateProductAction(
 
   if (!validation.success) {
     console.error("Update Product Validation Error:", validation.error.flatten().fieldErrors);
-    return { 
-      success: false, 
+    return {
+      success: false,
       error: "Invalid product data for update.",
       fieldErrors: validation.error.flatten().fieldErrors,
     };
   }
-  
+
   const { id, ...productDataToUpdate } = validation.data;
 
   try {
-    const success = await updateProductInFirestore(id, productDataToUpdate);
+    // Ensure 'stock' is part of the data passed to Firestore
+    const dataForFirestoreUpdate = {
+      ...productDataToUpdate,
+      stock: productDataToUpdate.stock, // Explicitly include stock
+    };
+
+    const success = await updateProductInFirestore(id, dataForFirestoreUpdate);
 
     if (success) {
       revalidatePath('/admin/products');
@@ -130,7 +139,6 @@ export async function deleteProductAction(productId: string): Promise<ActionResu
       revalidatePath('/admin/products');
       revalidatePath('/products');
       revalidatePath('/');
-      // Potentially revalidate collection pages if you know the product's category
       return { success: true, data: null };
     } else {
       return { success: false, error: "Failed to delete product from the database." };

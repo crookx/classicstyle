@@ -14,29 +14,48 @@ interface AddToCartButtonProps {
 }
 
 export default function AddToCartButton({ product }: AddToCartButtonProps) {
-  const { addToCart } = useCart();
+  const { addToCart, loadingCart } = useCart();
   const { toast } = useToast();
   const { currentUser, loading: authLoading } = useAuth();
   const router = useRouter();
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (authLoading) return;
     if (!currentUser) {
       toast({
         title: 'Authentication Required',
         description: 'Please log in to add items to your cart.',
         variant: 'destructive',
+        action: (
+          <button onClick={() => router.push(`/login?redirect=/products/${product.id}`)} className="ml-auto rounded-md border bg-background px-3 py-1.5 text-sm hover:bg-accent">
+            Login
+          </button>
+        )
       });
-      router.push(`/login?redirect=/products/${product.id}`);
       return;
     }
-    addToCart(product);
-    toast({ title: `${product.name} added to cart.` });
+    if (product.stock <= 0) {
+        toast({ title: "Out of Stock", description: `${product.name} is currently out of stock.`, variant: "destructive" });
+        return;
+    }
+    try {
+      await addToCart(product);
+      toast({ title: `${product.name} added to cart.` });
+    } catch (error) {
+      console.error("Failed to add to cart:", error);
+      toast({ title: "Error", description: `Could not add ${product.name} to cart.`, variant: "destructive" });
+    }
   };
 
   return (
-    <Button size="lg" onClick={handleAddToCart} className="flex-1 bg-primary hover:bg-primary/90" disabled={authLoading}>
-      <ShoppingCart className="mr-2 h-5 w-5" /> Add to Cart
+    <Button
+      size="lg"
+      onClick={handleAddToCart}
+      className="flex-1 bg-primary hover:bg-primary/90"
+      disabled={authLoading || loadingCart || product.stock === 0}
+    >
+      <ShoppingCart className="mr-2 h-5 w-5" />
+      {product.stock === 0 ? "Out of Stock" : "Add to Cart"}
     </Button>
   );
 }

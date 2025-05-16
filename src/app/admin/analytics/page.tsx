@@ -1,11 +1,11 @@
 
-'use client'; 
+'use client';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { BarChart3, DollarSign, Users, ShoppingCart, TrendingUp, AlertTriangle } from "lucide-react";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Pie, PieChart, Cell } from "recharts";
-import { useEffect, useState } from "react"; 
+import { useEffect, useState } from "react";
 
 const generateMockSalesData = () => [
   { month: "Jan", sales: Math.floor(Math.random() * 300000) + 100000 }, // KES values
@@ -17,10 +17,10 @@ const generateMockSalesData = () => [
 ];
 
 const mockCategoryData = [
-  { name: "Men", value: 40000, fill: "hsl(var(--chart-1))" }, // KES values
-  { name: "Women", value: 30000, fill: "hsl(var(--chart-2))" },
-  { name: "Kids", value: 20000, fill: "hsl(var(--chart-3))" },
-  { name: "Accessories", value: 27800, fill: "hsl(var(--chart-4))" },
+  { name: "Men", value: 400000, fill: "hsl(var(--chart-1))" }, // KES values
+  { name: "Women", value: 300000, fill: "hsl(var(--chart-2))" },
+  { name: "Kids", value: 200000, fill: "hsl(var(--chart-3))" },
+  { name: "Accessories", value: 278000, fill: "hsl(var(--chart-4))" },
 ];
 
 const chartConfig = {
@@ -34,7 +34,7 @@ export default function AdminAnalyticsPage() {
 
   useEffect(() => {
     setSalesData(generateMockSalesData());
-    setIsClient(true); 
+    setIsClient(true);
   }, []);
 
   if (!isClient) {
@@ -45,7 +45,7 @@ export default function AdminAnalyticsPage() {
           <p className="text-muted-foreground">Loading analytics data...</p>
         </div>
       </div>
-    ); 
+    );
   }
 
   return (
@@ -62,7 +62,7 @@ export default function AdminAnalyticsPage() {
             <DollarSign className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">KSh 4,523,189.00</div>
+            <div className="text-3xl font-bold">KSh 4,523,189.00</div> {/* Example KES value */}
             <p className="text-xs text-muted-foreground pt-1">+20.1% from last month</p>
           </CardContent>
         </Card>
@@ -97,7 +97,7 @@ export default function AdminAnalyticsPage() {
           </CardContent>
         </Card>
       </div>
-      
+
       <div className="grid gap-6 md:grid-cols-2">
         <Card className="shadow-xl rounded-xl">
           <CardHeader>
@@ -161,7 +161,7 @@ export default function AdminAnalyticsPage() {
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground">
-            The analytics data displayed here is currently **static mock data** for demonstration purposes. 
+            The analytics data displayed here is currently **static mock data** for demonstration purposes.
             Real-time analytics and dynamic report generation will be implemented with database integration.
           </p>
         </CardContent>
