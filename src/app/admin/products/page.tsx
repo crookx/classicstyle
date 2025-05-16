@@ -69,12 +69,12 @@ export default function AdminProductsPage() {
                     <Badge variant="default">Published</Badge> {/* Placeholder */}
                   </TableCell>
                   <TableCell className="text-right space-x-2">
-                    <Button variant="outline" size="icon" asChild disabled> {/* Edit disabled for now */}
-                      <Link href={`/admin/products/${product.id}/edit`}>
+                    <Link href={`/admin/products/${product.id}/edit`} asChild>
+                      <Button variant="outline" size="icon" disabled> {/* Edit disabled for now. Button is NOT asChild. Link IS asChild. */}
                         <Edit className="h-4 w-4" />
                         <span className="sr-only">Edit</span>
-                      </Link>
-                    </Button>
+                      </Button>
+                    </Link>
                     <Button variant="destructive" size="icon" disabled> {/* Delete disabled for now */}
                       <Trash2 className="h-4 w-4" />
                       <span className="sr-only">Delete</span>
