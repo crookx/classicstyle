@@ -9,15 +9,15 @@ import { Label } from '@/components/ui/label';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { useCart } from '@/contexts/CartContext';
+import { useCart, type CartItem } from '@/contexts/CartContext';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/contexts/AuthContext'; 
-import { useRouter } from 'next/navigation'; 
-import { useEffect } from 'react'; 
+import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
-
+import type { User } from 'firebase/auth';
 
 const shippingSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -26,7 +26,7 @@ const shippingSchema = z.object({
   address: z.string().min(1, { message: "Address is required." }),
   apartment: z.string().optional(),
   city: z.string().min(1, { message: "City is required." }),
-  country: z.string().min(1, { message: "Country is required." }), 
+  country: z.string().min(1, { message: "Country is required." }),
   postalCode: z.string().min(1, { message: "Postal code is required." }),
   phone: z.string().optional(),
 });
@@ -40,23 +40,58 @@ const paymentSchema = z.object({
 
 const checkoutSchema = shippingSchema.merge(paymentSchema);
 
+interface OrderDetailsForEmail {
+  orderNumber: string;
+  customerName: string;
+  customerEmail: string;
+  items: CartItem[];
+  totalAmount: number;
+  shippingAddress: {
+    firstName: string;
+    lastName: string;
+    address: string;
+    apartment?: string;
+    city: string;
+    country: string;
+    postalCode: string;
+  };
+  estimatedDelivery?: string; // Placeholder for now
+}
+
+// Placeholder function to simulate sending an order confirmation email
+async function initiateOrderConfirmationEmail(orderDetails: OrderDetailsForEmail) {
+  console.log('--- SIMULATING ORDER CONFIRMATION EMAIL ---');
+  console.log('To:', orderDetails.customerEmail);
+  console.log('Subject: Thank you for your order, ' + orderDetails.customerName + '! 🎉 Order #' + orderDetails.orderNumber + ' confirmed.');
+  console.log('Body would contain:');
+  console.log('  Order Summary:', orderDetails.items.map(item => `${item.name} (Qty: ${item.quantity}) - KSh ${(item.price * item.quantity).toFixed(2)}`).join(', '));
+  console.log('  Total Amount: KSh', orderDetails.totalAmount.toFixed(2));
+  console.log('  Shipping To:', orderDetails.shippingAddress);
+  console.log('  Estimated Delivery:', orderDetails.estimatedDelivery || '3-5 business days');
+  console.log('--- END OF SIMULATION ---');
+  // In a real application, this function would make an API call to your backend
+  // which then uses an email service (SendGrid, Mailgun, etc.) to send the actual email.
+  // Example: await fetch('/api/send-order-confirmation', { method: 'POST', body: JSON.stringify(orderDetails) });
+}
+
 
 export default function CheckoutPage() {
   const { cart, totalPrice, totalItems, clearCart } = useCart();
   const { toast } = useToast();
-  const { currentUser, loading: authLoading } = useAuth(); 
-  const router = useRouter(); 
+  const { currentUser, loading: authLoading } = useAuth();
+  const router = useRouter();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<z.infer<typeof checkoutSchema>>({
     resolver: zodResolver(checkoutSchema),
     defaultValues: {
-      email: currentUser?.email || '', 
+      email: currentUser?.email || '',
       firstName: '',
       lastName: '',
       address: '',
       apartment: '',
       city: '',
-      country: 'Kenya', // Default to Kenya
+      country: 'Kenya',
       postalCode: '',
       phone: '',
       cardNumber: '',
@@ -76,17 +111,46 @@ export default function CheckoutPage() {
     }
   }, [currentUser, authLoading, router, toast, form]);
 
+  async function onSubmit(values: z.infer<typeof checkoutSchema>) {
+    setIsSubmitting(true);
+    console.log('Checkout submitted with form values:', values);
 
-  function onSubmit(values: z.infer<typeof checkoutSchema>) {
-    console.log('Checkout submitted:', values);
+    // This is a mock order placement.
+    // In a real app, you would save the order to your database here.
+    const mockOrderNumber = `CS${Date.now().toString().slice(-6)}`;
+
+    const orderDetailsForEmail: OrderDetailsForEmail = {
+      orderNumber: mockOrderNumber,
+      customerName: `${values.firstName} ${values.lastName}`,
+      customerEmail: values.email,
+      items: cart, // Assuming cart items have all necessary details
+      totalAmount: totalPrice,
+      shippingAddress: {
+        firstName: values.firstName,
+        lastName: values.lastName,
+        address: values.address,
+        apartment: values.apartment,
+        city: values.city,
+        country: values.country,
+        postalCode: values.postalCode,
+      },
+      // Estimated delivery could be calculated based on shipping method, etc.
+      estimatedDelivery: "3-5 business days (Kenya)",
+    };
+
+    // Simulate sending the order confirmation email
+    await initiateOrderConfirmationEmail(orderDetailsForEmail);
+
     toast({
       title: "Order Placed!",
-      description: "Thank you for your purchase. Your order is being processed.",
+      description: `Thank you for your purchase, ${values.firstName}! Your order #${mockOrderNumber} is being processed. A confirmation email has been simulated (check console).`,
     });
+
     clearCart();
-    router.push('/'); 
+    setIsSubmitting(false);
+    router.push('/');
   }
-  
+
   if (authLoading) {
     return (
       <div className="py-12 text-center flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
@@ -104,7 +168,7 @@ export default function CheckoutPage() {
         </div>
     )
   }
-  
+
   if (cart.length === 0) {
     return (
          <div className="py-8 text-center">
@@ -122,7 +186,7 @@ export default function CheckoutPage() {
       <div className="mb-10 text-center">
         <h1 className="text-4xl font-bold font-serif mb-2">Checkout</h1>
       </div>
-      
+
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="grid lg:grid-cols-3 gap-8 items-start">
           <div className="lg:col-span-2 space-y-8">
@@ -209,8 +273,8 @@ export default function CheckoutPage() {
               </div>
             </CardContent>
             <CardFooter className="p-0 pt-6">
-              <Button type="submit" size="lg" className="w-full text-lg" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? (
+              <Button type="submit" size="lg" className="w-full text-lg" disabled={form.formState.isSubmitting || isSubmitting}>
+                {(form.formState.isSubmitting || isSubmitting) ? (
                   <>
                     <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Processing...
                   </>
@@ -223,3 +287,5 @@ export default function CheckoutPage() {
     </div>
   );
 }
+
+    
