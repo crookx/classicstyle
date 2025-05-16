@@ -10,76 +10,98 @@ let serviceAccount: ServiceAccount;
 let db: FirebaseFirestore.Firestore;
 let adminAppInitialized = false;
 
+// This block will run when the Vercel function instance starts or during build analysis
 try {
   if (!getApps().length) {
     const base64ServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_KEY_JSON;
     if (!base64ServiceAccount) {
-      console.warn("FIREBASE_SERVICE_ACCOUNT_KEY_JSON environment variable is not set or is empty. Firebase Admin SDK will not initialize.");
-      // adminAppInitialized remains false
+      console.warn("FIREBASE_SERVICE_ACCOUNT_KEY_JSON environment variable is not set or is empty. Firebase Admin SDK will not initialize at module load.");
     } else {
       let decodedServiceAccountJson: string;
       try {
         decodedServiceAccountJson = Buffer.from(base64ServiceAccount, 'base64').toString('utf-8');
       } catch (e: any) {
-        console.error("Failed to decode Base64 service account key:", e.message);
+        console.error("Failed to decode Base64 service account key at module load:", e.message);
         throw new Error('Failed to decode FIREBASE_SERVICE_ACCOUNT_KEY_JSON. Ensure it is a valid Base64 string.');
       }
 
       try {
         serviceAccount = JSON.parse(decodedServiceAccountJson);
       } catch (e: any) {
-        console.error("Failed to parse service account JSON:", e.message);
+        console.error("Failed to parse service account JSON at module load:", e.message);
         throw new Error('Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY_JSON. Ensure it is valid JSON.');
       }
 
       if (!serviceAccount || typeof serviceAccount.project_id !== 'string' || !serviceAccount.project_id) {
-          console.error("Parsed service account is missing 'project_id' or it's not a string. Service Account content (first 200 chars):", JSON.stringify(serviceAccount).substring(0, 200) + "...");
+          console.error("Parsed service account is missing 'project_id' or it's not a string at module load. Service Account content (first 200 chars):", JSON.stringify(serviceAccount).substring(0, 200) + "...");
           throw new Error('Service account object must contain a string "project_id" property.');
       }
 
       initializeApp({
         credential: cert(serviceAccount),
       });
-      console.log("Firebase Admin SDK initialized successfully for Vercel function.");
+      console.log("Firebase Admin SDK initialized successfully for Vercel function (module load).");
       adminAppInitialized = true;
       db = getFirestore();
     }
   } else {
-    console.log("Firebase Admin SDK already initialized for Vercel function.");
+    console.log("Firebase Admin SDK already initialized for Vercel function (module load).");
     adminAppInitialized = true; // Already initialized
     db = getFirestore();
   }
 } catch (e: any) {
-  console.error("CRITICAL: Firebase Admin SDK initialization error in Vercel function:", e.message, e.stack);
-  // serviceAccount remains undefined or partially defined, db remains undefined
+  console.error("CRITICAL: Firebase Admin SDK initialization error in Vercel function (module load):", e.message, e.stack);
   // adminAppInitialized remains false
 }
 // --- End Firebase Admin Initialization ---
 
 // --- Stripe Initialization ---
-// Initialize Stripe globally. It's okay if the key is undefined here;
-// we'll check it at runtime in the POST handler.
-const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-// @ts-ignore Stripe constructor can accept undefined but will throw error on API calls if key is missing
-const stripe = new Stripe(stripeSecretKey, {
-  apiVersion: "2024-06-20",
-  typescript: true,
-});
+// Initialize Stripe SDK. It's okay if the key is undefined here at module load;
+// we'll critically check it at runtime in the POST handler.
+const stripeSecretKeyFromEnv = process.env.STRIPE_SECRET_KEY;
+let stripe: Stripe | null = null;
 
-if (!stripeSecretKey) {
+if (stripeSecretKeyFromEnv) {
+  try {
+    stripe = new Stripe(stripeSecretKeyFromEnv, {
+      apiVersion: "2024-06-20",
+      typescript: true,
+    });
+    console.log("Stripe SDK initialized at module load.");
+  } catch (e: any) {
+    console.error("Error initializing Stripe SDK at module load (key might be invalid format):", e.message);
+    stripe = null; // Ensure stripe is null if initialization fails
+  }
+} else {
   console.warn("Stripe secret_key is not set in environment variables at module load time (Vercel). Will check at runtime.");
 }
-// Webhook secret is only critically needed inside the POST handler.
 // --- End Stripe Initialization ---
 
 export async function POST(request: NextRequest) {
   // Runtime check for Firebase Admin SDK
   if (!adminAppInitialized || !db) {
-    console.error("Webhook Error: Firebase Admin SDK not initialized. Cannot process event.");
-    return NextResponse.json({error: "Webhook server error: Firebase Admin not available."}, {status: 500});
+    // Attempt re-initialization if it failed at module load, only if env var is present
+    if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY_JSON && !getApps().length) {
+        try {
+            console.log("Attempting runtime Firebase Admin SDK re-initialization...");
+            const base64ServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_KEY_JSON;
+            const decodedServiceAccountJson = Buffer.from(base64ServiceAccount, 'base64').toString('utf-8');
+            serviceAccount = JSON.parse(decodedServiceAccountJson);
+            initializeApp({ credential: cert(serviceAccount) });
+            db = getFirestore();
+            adminAppInitialized = true;
+            console.log("Runtime Firebase Admin SDK re-initialization successful.");
+        } catch (e: any) {
+            console.error("Runtime Firebase Admin SDK re-initialization failed:", e.message);
+            return NextResponse.json({error: "Webhook server error: Firebase Admin not available (runtime init failed)."}, {status: 500});
+        }
+    } else if (!adminAppInitialized) {
+        console.error("Webhook Error: Firebase Admin SDK not initialized and cannot re-initialize. Cannot process event.");
+        return NextResponse.json({error: "Webhook server error: Firebase Admin not available."}, {status: 500});
+    }
   }
 
-  // Runtime check for Stripe keys
+  // Runtime check for Stripe keys and re-initialize Stripe instance if needed
   const currentStripeSecretKey = process.env.STRIPE_SECRET_KEY;
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET_VERCEL;
 
@@ -87,16 +109,32 @@ export async function POST(request: NextRequest) {
     console.error("Webhook Error: Stripe Secret Key not configured at runtime on Vercel.");
     return NextResponse.json({error: "Webhook server error: Stripe secret key missing."}, {status: 500});
   }
-  // The global `stripe` instance should now use the runtime key if it was missing at build.
-  // If the key was present at build, it's already configured.
-  // If the key changes, a new deployment is needed for the global instance to pick it up,
-  // but for runtime, this check ensures it's present.
+
+  // If stripe was not initialized at module load, try now with runtime env var
+  if (!stripe) {
+    try {
+      stripe = new Stripe(currentStripeSecretKey, {
+        apiVersion: "2024-06-20",
+        typescript: true,
+      });
+      console.log("Stripe SDK initialized at runtime.");
+    } catch (e: any) {
+        console.error("Error initializing Stripe SDK at runtime:", e.message);
+        return NextResponse.json({error: "Webhook server error: Stripe SDK could not be initialized."}, {status: 500});
+    }
+  }
+  
+  // This stripe should now be the valid instance
+  if (!stripe) { // Should not happen if the above logic is correct and key is valid
+    console.error("Webhook Error: Stripe SDK is unexpectedly null at runtime.");
+    return NextResponse.json({error: "Webhook server error: Stripe SDK unavailable."}, {status: 500});
+  }
+
 
   if (!webhookSecret) {
     console.error("Webhook Error: Webhook signing secret (STRIPE_WEBHOOK_SECRET_VERCEL) not configured at runtime on Vercel.");
     return NextResponse.json({error: "Webhook server error: Signing secret missing."}, {status: 500});
   }
-
 
   const sig = request.headers.get('stripe-signature') as string;
   if (!sig) {
@@ -108,13 +146,6 @@ export async function POST(request: NextRequest) {
   let event: Stripe.Event;
 
   try {
-    // Use the globally initialized stripe instance. If its key was undefined at module load,
-    // it would error here if not for the runtime check above ensuring currentStripeSecretKey exists.
-    // However, the Stripe SDK might not dynamically pick up the key if it was initially undefined.
-    // For robustness, ensure the stripe instance used for constructEvent has the key.
-    // The global `stripe` object should be fine if process.env.STRIPE_SECRET_KEY was set at module load.
-    // If it was set later (runtime only for Vercel), a local instance might be safer for constructEvent
-    // but let's rely on the initial log and runtime check.
     event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
   } catch (err: any) {
     console.error(`Vercel Webhook signature verification failed: ${err.message}`);
