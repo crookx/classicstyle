@@ -7,6 +7,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { SiteLogo } from '@/components/layout/SiteLogo';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button'; // Added missing import
 import {
   LayoutDashboard,
   Package,
