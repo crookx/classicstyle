@@ -5,6 +5,16 @@ import Stripe from "stripe";
 import express = require("express");
 import cors = require("cors");
 
+// Define a more specific type for order items if not importing from shared types
+interface FirebaseOrderItem {
+  productId: string;
+  name: string;
+  quantity: number;
+  price: number;
+  imageUrl?: string;
+}
+
+
 // Initialize Firebase Admin SDK only once
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -67,9 +77,15 @@ app.post(
 
     try {
       event = stripeInstance.webhooks.constructEvent(req.body, sig, webhookSecret);
-    } catch (err: any) {
-      console.error(`Webhook signature verification failed: ${err.message}`);
-      res.status(400).send(`Webhook Error: ${err.message}`);
+    } catch (err: unknown) { // Changed from err: any
+      let message = "An unknown error occurred during webhook signature verification.";
+      if (err instanceof Error) {
+        message = err.message;
+      } else if (typeof err === "string") {
+        message = err;
+      }
+      console.error(`Webhook signature verification failed: ${message}`);
+      res.status(400).send(`Webhook Error: ${message}`);
       return;
     }
 
