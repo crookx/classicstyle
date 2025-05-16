@@ -1,8 +1,9 @@
 
-'use client';
+'use client'; // This page involves client-side filtering and state management
+
 import { useState, useEffect, useMemo } from 'react';
 import ProductGrid from '@/components/product/ProductGrid';
-import { mockProducts } from '@/data/mock-data';
+import { getProducts as fetchProductsFromDB } from '@/lib/firebase/firestoreService'; // Renamed import
 import type { Product } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,41 +12,59 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Slider } from '@/components/ui/slider';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Filter, X } from 'lucide-react';
-import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet'; // Added SheetHeader, SheetTitle
-
-const allCategories = Array.from(new Set(mockProducts.map(p => p.category).filter(Boolean))) as string[];
-const maxPrice = Math.max(...mockProducts.map(p => p.price));
+import { Filter } from 'lucide-react';
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Skeleton } from '@/components/ui/skeleton'; // For loading state
 
 export default function ProductsPage() {
-  const [products, setProducts] = useState<Product[]>(mockProducts);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, maxPrice]);
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 500]); // Default, will update
+  const [maxPossiblePrice, setMaxPossiblePrice] = useState(500);
   const [sortBy, setSortBy] = useState('featured');
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [allAvailableCategories, setAllAvailableCategories] = useState<string[]>([]);
 
+  useEffect(() => {
+    async function loadProducts() {
+      setIsLoading(true);
+      const productsFromDB = await fetchProductsFromDB();
+      setAllProducts(productsFromDB);
+      setFilteredProducts(productsFromDB); // Initially show all
 
-  const filteredAndSortedProducts = useMemo(() => {
-    let tempProducts = [...mockProducts];
+      if (productsFromDB.length > 0) {
+        const categories = Array.from(new Set(productsFromDB.map(p => p.category).filter(Boolean))) as string[];
+        setAllAvailableCategories(categories);
+        
+        const maxPriceFromData = Math.max(...productsFromDB.map(p => p.price), 0);
+        setMaxPossiblePrice(maxPriceFromData > 0 ? maxPriceFromData : 500);
+        setPriceRange([0, maxPriceFromData > 0 ? maxPriceFromData : 500]);
+      }
+      setIsLoading(false);
+    }
+    loadProducts();
+  }, []);
 
-    // Search filter
+  const processedProducts = useMemo(() => {
+    let tempProducts = [...allProducts];
+
     if (searchTerm) {
       tempProducts = tempProducts.filter(p =>
         p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.description.toLowerCase().includes(searchTerm.toLowerCase())
+        (p.description && p.description.toLowerCase().includes(searchTerm.toLowerCase()))
       );
     }
 
-    // Category filter
     if (selectedCategories.length > 0) {
       tempProducts = tempProducts.filter(p => p.category && selectedCategories.includes(p.category));
     }
 
-    // Price range filter
     tempProducts = tempProducts.filter(p => p.price >= priceRange[0] && p.price <= priceRange[1]);
 
-    // Sorting
     switch (sortBy) {
       case 'price-asc':
         tempProducts.sort((a, b) => a.price - b.price);
@@ -59,20 +78,17 @@ export default function ProductsPage() {
       case 'name-desc':
         tempProducts.sort((a, b) => b.name.localeCompare(a.name));
         break;
-      // Add more sorting options like 'newest', 'rating' if data supports
       case 'featured':
       default:
-        // No specific sort for featured, could be based on an order property or default
-        tempProducts.sort((a,b) => (b.tags?.includes('featured') ? 1 : 0) - (a.tags?.includes('featured') ? 1 : 0) );
+        tempProducts.sort((a,b) => (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0) );
         break;
     }
     return tempProducts;
-  }, [searchTerm, selectedCategories, priceRange, sortBy]);
-  
-  useEffect(() => {
-    setProducts(filteredAndSortedProducts);
-  }, [filteredAndSortedProducts]);
+  }, [allProducts, searchTerm, selectedCategories, priceRange, sortBy]);
 
+  useEffect(() => {
+    setFilteredProducts(processedProducts);
+  }, [processedProducts]);
 
   const handleCategoryChange = (category: string) => {
     setSelectedCategories(prev =>
@@ -80,14 +96,20 @@ export default function ProductsPage() {
     );
   };
 
+  const clearAllFilters = () => {
+    setSearchTerm('');
+    setSelectedCategories([]);
+    setPriceRange([0, maxPossiblePrice]);
+    setSortBy('featured');
+  };
+
   const FiltersContent = () => (
-    <Card className="shadow-lg rounded-xl border-none"> {/* Removed border as sheet will handle it */}
-      {/* CardHeader is removed from here as SheetHeader will provide the title */}
-      <CardContent className="space-y-6 pt-6"> {/* Added pt-6 as CardHeader is removed */}
+    <Card className="shadow-lg rounded-xl border-none">
+      <CardContent className="space-y-6 pt-6">
         <div>
-          <Label htmlFor="search" className="text-base font-medium">Search</Label>
+          <Label htmlFor="search-filter" className="text-base font-medium">Search</Label>
           <Input
-            id="search"
+            id="search-filter"
             type="text"
             placeholder="Search products..."
             value={searchTerm}
@@ -95,27 +117,29 @@ export default function ProductsPage() {
             className="mt-1"
           />
         </div>
-        <div>
-          <h3 className="text-base font-medium mb-2">Category</h3>
-          <div className="space-y-2">
-            {allCategories.map(category => (
-              <div key={category} className="flex items-center space-x-2">
-                <Checkbox
-                  id={`category-${category}`}
-                  checked={selectedCategories.includes(category)}
-                  onCheckedChange={() => handleCategoryChange(category)}
-                />
-                <Label htmlFor={`category-${category}`} className="font-normal">{category}</Label>
-              </div>
-            ))}
+        {allAvailableCategories.length > 0 && (
+          <div>
+            <h3 className="text-base font-medium mb-2">Category</h3>
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {allAvailableCategories.map(category => (
+                <div key={category} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`category-filter-${category}`}
+                    checked={selectedCategories.includes(category)}
+                    onCheckedChange={() => handleCategoryChange(category)}
+                  />
+                  <Label htmlFor={`category-filter-${category}`} className="font-normal">{category}</Label>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
         <div>
           <h3 className="text-base font-medium mb-2">Price Range</h3>
           <Slider
             min={0}
-            max={maxPrice}
-            step={10}
+            max={maxPossiblePrice}
+            step={1} // More granular for KES-like values
             value={priceRange}
             onValueChange={(value) => setPriceRange(value as [number, number])}
             className="mt-1"
@@ -125,17 +149,43 @@ export default function ProductsPage() {
             <span>${priceRange[1]}</span>
           </div>
         </div>
-         <Button onClick={() => {
-            setSearchTerm('');
-            setSelectedCategories([]);
-            setPriceRange([0, maxPrice]);
-            setSortBy('featured');
-         }} variant="outline" className="w-full">
+        <Button onClick={clearAllFilters} variant="outline" className="w-full">
             Clear All Filters
         </Button>
       </CardContent>
     </Card>
   );
+  
+  if (isLoading) {
+    return (
+      <div className="py-8">
+        <div className="mb-10 text-center">
+          <Skeleton className="h-10 w-1/2 mx-auto mb-2" />
+          <Skeleton className="h-6 w-3/4 mx-auto" />
+        </div>
+        <div className="flex flex-col md:flex-row gap-8">
+          <aside className="hidden md:block md:w-1/4 lg:w-1/5 space-y-6">
+            <Card className="shadow-lg rounded-xl sticky top-24">
+              <CardHeader><Skeleton className="h-6 w-20" /></CardHeader>
+              <CardContent className="space-y-4">
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-20 w-full" />
+                <Skeleton className="h-12 w-full" />
+              </CardContent>
+            </Card>
+          </aside>
+          <main className="flex-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 lg:gap-8">
+              {[...Array(6)].map((_, i) => (
+                <Card key={i}><CardContent className="p-4"><Skeleton className="aspect-[4/5] w-full" /></CardContent></Card>
+              ))}
+            </div>
+          </main>
+        </div>
+      </div>
+    );
+  }
+
 
   return (
     <div className="py-8">
@@ -145,73 +195,19 @@ export default function ProductsPage() {
       </div>
 
       <div className="flex flex-col md:flex-row gap-8">
-        {/* Filters Sidebar - Desktop */}
         <aside className="hidden md:block md:w-1/4 lg:w-1/5 space-y-6">
           <Card className="shadow-lg rounded-xl sticky top-24">
              <CardHeader>
                 <CardTitle className="text-xl font-serif">Filters</CardTitle>
             </CardHeader>
-            {/* Content of filters moved into its own card for desktop */}
-            <CardContent className="space-y-6">
-              <div>
-                <Label htmlFor="search-desktop" className="text-base font-medium">Search</Label>
-                <Input
-                  id="search-desktop"
-                  type="text"
-                  placeholder="Search products..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <h3 className="text-base font-medium mb-2">Category</h3>
-                <div className="space-y-2">
-                  {allCategories.map(category => (
-                    <div key={category} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`category-desktop-${category}`}
-                        checked={selectedCategories.includes(category)}
-                        onCheckedChange={() => handleCategoryChange(category)}
-                      />
-                      <Label htmlFor={`category-desktop-${category}`} className="font-normal">{category}</Label>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <h3 className="text-base font-medium mb-2">Price Range</h3>
-                <Slider
-                  min={0}
-                  max={maxPrice}
-                  step={10}
-                  value={priceRange}
-                  onValueChange={(value) => setPriceRange(value as [number, number])}
-                  className="mt-1"
-                />
-                <div className="flex justify-between text-sm text-muted-foreground mt-2">
-                  <span>${priceRange[0]}</span>
-                  <span>${priceRange[1]}</span>
-                </div>
-              </div>
-              <Button onClick={() => {
-                  setSearchTerm('');
-                  setSelectedCategories([]);
-                  setPriceRange([0, maxPrice]);
-                  setSortBy('featured');
-              }} variant="outline" className="w-full">
-                  Clear All Filters
-              </Button>
-            </CardContent>
+            <FiltersContent />
           </Card>
         </aside>
 
-        {/* Products Grid */}
         <main className="flex-1">
           <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
-            <p className="text-sm text-muted-foreground">{products.length} products found</p>
+            <p className="text-sm text-muted-foreground">{filteredProducts.length} products found</p>
             
-            {/* Mobile Filter Trigger */}
             <div className="md:hidden">
               <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
                 <SheetTrigger asChild>
@@ -241,7 +237,10 @@ export default function ProductsPage() {
               </SelectContent>
             </Select>
           </div>
-          <ProductGrid products={products} columns="3" />
+          <ProductGrid products={filteredProducts} columns="3" />
+          {filteredProducts.length === 0 && !isLoading && (
+            <p className="text-center py-10 text-muted-foreground">No products match your current filters.</p>
+          )}
         </main>
       </div>
     </div>

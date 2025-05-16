@@ -2,27 +2,32 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { mockProducts } from '@/data/mock-data'; // Assuming mockProducts is exportable and mutable (let)
-import type { Product } from '@/types';
+import type { Product, ProductColor } from '@/types';
 import { z } from 'zod';
+import { addProduct as addProductToFirestore } from '@/lib/firebase/firestoreService';
 
-// Basic schema for adding a product (can be expanded)
-// Note: This schema matches closely with ProductFormValues from ProductForm.tsx for consistency
+// Schema for adding a product, matches ProductFormValues and Firestore structure
 const AddProductSchema = z.object({
-  name: z.string().min(3),
-  price: z.number().positive(),
-  originalPrice: z.number().optional(),
-  imageUrl: z.string().url().or(z.literal('')),
-  dataAiHint: z.string().optional(),
-  category: z.string().min(2),
-  subCategory: z.string().optional(),
-  description: z.string().min(10),
-  details: z.array(z.string()).optional(),
-  colors: z.array(z.object({ name: z.string(), hex: z.string() })).optional(),
-  sizes: z.array(z.string()).optional(),
-  tags: z.array(z.string()).optional(),
-  sku: z.string().optional(),
-  isFeatured: z.boolean().optional().default(false),
+  name: z.string().min(3, { message: "Product name must be at least 3 characters." }),
+  price: z.coerce.number().positive({ message: "Price must be a positive number." }),
+  originalPrice: z.coerce.number().optional().default(0).transform(val => val || null), // Firestore prefers null
+  imageUrl: z.string().url({ message: "Please enter a valid image URL." }).or(z.literal('')),
+  dataAiHint: z.string().optional().transform(val => val || null),
+  category: z.string().min(2, { message: "Category is required." }),
+  subCategory: z.string().optional().transform(val => val || null),
+  description: z.string().min(10, { message: "Description must be at least 10 characters." }),
+  details: z.string().optional().transform(val => val ? val.split('\\n').map(d => d.trim()).filter(d => d) : null),
+  colors: z.string().optional().transform(val => {
+    if (!val) return null;
+    return val.split(',').map(c => {
+      const parts = c.split(':');
+      return { name: parts[0]?.trim(), hex: parts[1]?.trim() };
+    }).filter(c => c.name && c.hex) as ProductColor[];
+  }),
+  sizes: z.string().optional().transform(val => val ? val.split(',').map(s => s.trim()).filter(s => s) : null),
+  tags: z.string().optional().transform(val => val ? val.split(',').map(t => t.trim()).filter(t => t) : null),
+  sku: z.string().optional().transform(val => val || null),
+  isFeatured: z.boolean().default(false).optional(),
 });
 
 interface ActionResult {
@@ -32,14 +37,10 @@ interface ActionResult {
 }
 
 export async function addProductAction(
-  data: Omit<Product, 'id' | 'rating' | 'reviewCount'>
+  formData: unknown // Changed from specific type to allow raw form data parsing
 ): Promise<ActionResult> {
-  // IMPORTANT CAVEAT:
-  // This action modifies an in-memory array (mockProducts).
-  // These changes WILL NOT PERSIST if the server restarts or across different server instances.
-  // A real database (e.g., Firebase Firestore, Supabase, MongoDB) is required for persistent storage.
-  
-  const validation = AddProductSchema.safeParse(data);
+  // We expect formData to be the raw data from the form. Let Zod parse it.
+  const validation = AddProductSchema.safeParse(formData);
 
   if (!validation.success) {
     console.error("Add Product Validation Error:", validation.error.flatten().fieldErrors);
@@ -50,38 +51,30 @@ export async function addProductAction(
   }
 
   try {
-    const newProduct: Product = {
-      ...validation.data, // Use validated and transformed data
-      id: `prod-${Date.now().toString()}-${Math.random().toString(36).substring(2, 7)}`, // Simple unique ID
-      // rating and reviewCount would typically be managed elsewhere or start at 0/null
-      rating: undefined, // Or some default like 0 or null
-      reviewCount: undefined, // Or some default like 0 or null
+    // The validated and transformed data is in validation.data
+    const productDataForFirestore: Omit<Product, 'id' | 'rating' | 'reviewCount'> = {
+      ...validation.data,
+      // rating and reviewCount are not part of the form, will be undefined or set by Firestore logic if any
     };
 
-    mockProducts.unshift(newProduct); // Add to the beginning of the array
+    const newProduct = await addProductToFirestore(productDataForFirestore);
 
-    revalidatePath('/admin/products'); // Revalidate the product list page
-    revalidatePath('/products'); // Revalidate public products page
-    revalidatePath('/'); // Revalidate home page if featured products might change
-
-    return { success: true, product: newProduct };
+    if (newProduct) {
+      revalidatePath('/admin/products');
+      revalidatePath('/products');
+      revalidatePath('/');
+      // Revalidate specific collection pages if applicable based on category
+      if (newProduct.category) {
+        // This is a simplification; ideally, slugify category for path
+        revalidatePath(`/collections/${newProduct.category.toLowerCase().replace(/\s+/g, '-')}`);
+      }
+      return { success: true, product: newProduct };
+    } else {
+      return { success: false, error: "Failed to add product to the database." };
+    }
   } catch (error) {
-    console.error("Error adding product:", error);
-    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
+    console.error("Error in addProductAction:", error);
+    const errorMessage = error instanceof Error ? error.message : "An unknown server error occurred.";
     return { success: false, error: `Failed to add product: ${errorMessage}` };
   }
 }
-
-// Placeholder for future actions
-// export async function updateProductAction(productId: string, data: Partial<Product>): Promise<ActionResult> {
-//   // Find product by ID and update
-//   // Revalidate paths
-//   return { success: false, error: "Update not implemented yet." };
-// }
-
-// export async function deleteProductAction(productId: string): Promise<{ success: boolean; error?: string }> {
-//   // Filter out product by ID
-//   // Revalidate paths
-//   return { success: false, error: "Delete not implemented yet." };
-// }
-

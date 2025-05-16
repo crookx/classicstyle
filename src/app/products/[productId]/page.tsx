@@ -1,103 +1,41 @@
 
-'use client';
-import { useParams, useRouter } from 'next/navigation'; // Added useRouter
 import Image from 'next/image';
-import { mockProducts, mockCollections } from '@/data/mock-data';
-import type { Product } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Heart, ShoppingCart, Star, CheckCircle, ShieldCheck } from 'lucide-react';
-import { useWishlist } from '@/contexts/WishlistContext';
-import { useCart } from '@/contexts/CartContext';
-import { useToast } from '@/hooks/use-toast';
-import { useState, useEffect } from 'react';
 import { Separator } from '@/components/ui/separator';
 import ProductGrid from '@/components/product/ProductGrid';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
-} from "@/components/ui/accordion"
-import { useAuth } from '@/contexts/AuthContext'; // Added
+} from "@/components/ui/accordion";
+import { getProductById, getProductsByCategoryId } from '@/lib/firebase/firestoreService';
+import type { Product } from '@/types';
+import AddToCartButton from './AddToCartButton'; // Client component for cart interaction
+import WishlistToggleButton from './WishlistToggleButton'; // Client component for wishlist
+import { notFound } from 'next/navigation';
 
-export default function ProductDetailPage() {
-  const params = useParams();
-  const productId = params.productId as string;
-  const router = useRouter(); // Added
-  
-  const [product, setProduct] = useState<Product | null>(null);
-  const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
-  const [selectedColor, setSelectedColor] = useState<string | undefined>(undefined);
-  const [selectedSize, setSelectedSize] = useState<string | undefined>(undefined);
+interface ProductDetailPageProps {
+  params: { productId: string };
+}
 
-  const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
-  const { addToCart } = useCart();
-  const { toast } = useToast();
-  const { currentUser, loading: authLoading } = useAuth(); // Added
-
-  useEffect(() => {
-    const foundProduct = mockProducts.find(p => p.id === productId);
-    if (foundProduct) {
-      setProduct(foundProduct);
-      setSelectedColor(foundProduct.colors?.[0]?.name);
-      setSelectedSize(foundProduct.sizes?.[0]);
-
-      const related = mockProducts.filter(
-        p => p.category === foundProduct.category && p.id !== foundProduct.id
-      ).slice(0, 4);
-      setRelatedProducts(related);
-    }
-  }, [productId]);
+export default async function ProductDetailPage({ params }: ProductDetailPageProps) {
+  const productId = params.productId;
+  const product = await getProductById(productId);
 
   if (!product) {
-    return (
-      <div className="container mx-auto px-4 py-12 text-center">
-        <h1 className="text-2xl font-semibold">Loading product details...</h1>
-      </div>
-    );
+    notFound(); // Or redirect to a 404 page
   }
 
-  const handleWishlistToggle = () => {
-    if (authLoading) return;
-    if (!currentUser) {
-      toast({
-        title: 'Authentication Required',
-        description: 'Please log in to add items to your wishlist.',
-        variant: 'destructive',
-      });
-      router.push(`/login?redirect=${router.asPath}`);
-      return;
-    }
-
-    if (isInWishlist(product.id)) {
-      removeFromWishlist(product.id);
-      toast({ title: `${product.name} removed from wishlist.` });
-    } else {
-      addToWishlist(product);
-      toast({ title: `${product.name} added to wishlist.` });
-    }
-  };
-
-  const handleAddToCart = () => {
-    if (authLoading) return;
-    if (!currentUser) {
-      toast({
-        title: 'Authentication Required',
-        description: 'Please log in to add items to your cart.',
-        variant: 'destructive',
-      });
-      router.push(`/login?redirect=${router.asPath}`);
-      return;
-    }
-    addToCart(product); 
-    toast({ title: `${product.name} added to cart.` });
-  };
+  const relatedProducts = product.category 
+    ? await getProductsByCategoryId(product.category, product.id, 4) 
+    : [];
 
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="grid md:grid-cols-2 gap-8 lg:gap-12 mb-12">
-        {/* Product Image Gallery */}
         <div className="shadow-xl rounded-lg overflow-hidden">
           <Image
             src={product.imageUrl}
@@ -105,21 +43,20 @@ export default function ProductDetailPage() {
             width={800}
             height={1000}
             className="w-full h-auto object-cover"
-            data-ai-hint={product.dataAiHint}
+            data-ai-hint={product.dataAiHint || product.name}
             priority
           />
         </div>
 
-        {/* Product Details */}
         <div className="space-y-6">
           <h1 className="text-4xl font-bold font-serif">{product.name}</h1>
           
-          {product.rating && (
+          {product.rating && typeof product.rating === 'number' && (
             <div className="flex items-center">
               {[...Array(5)].map((_, i) => (
                 <Star key={i} className={`h-5 w-5 ${i < Math.floor(product.rating!) ? 'text-primary fill-primary' : 'text-muted-foreground'}`} />
               ))}
-              <span className="ml-2 text-sm text-muted-foreground">({product.reviewCount} reviews)</span>
+              {product.reviewCount && <span className="ml-2 text-sm text-muted-foreground">({product.reviewCount} reviews)</span>}
             </div>
           )}
 
@@ -132,20 +69,16 @@ export default function ProductDetailPage() {
           
           <p className="text-base text-foreground/80 leading-relaxed">{product.description}</p>
 
+          {/* Color and Size selection would need to be client components if they affect state */}
+          {/* For now, displaying available colors/sizes if they exist */}
           {product.colors && product.colors.length > 0 && (
             <div>
-              <h3 className="text-sm font-medium text-foreground mb-2">Color: <span className="font-semibold">{selectedColor}</span></h3>
-              <div className="flex space-x-2">
+              <h3 className="text-sm font-medium text-foreground mb-2">Available Colors:</h3>
+              <div className="flex flex-wrap gap-2">
                 {product.colors.map(color => (
-                  <Button
-                    key={color.name}
-                    variant="outline"
-                    size="icon"
-                    className={`h-8 w-8 rounded-full border-2 ${selectedColor === color.name ? 'border-primary ring-2 ring-primary ring-offset-2' : 'border-border'}`}
-                    style={{ backgroundColor: color.hex }}
-                    onClick={() => setSelectedColor(color.name)}
-                    aria-label={`Select color ${color.name}`}
-                  />
+                  <span key={color.name} className="p-1 px-2 text-xs border rounded-full" style={{ backgroundColor: color.hex, color: '#000' /* Adjust text color based on hex for contrast */ }}>
+                    {color.name}
+                  </span>
                 ))}
               </div>
             </div>
@@ -153,17 +86,12 @@ export default function ProductDetailPage() {
 
           {product.sizes && product.sizes.length > 0 && (
             <div>
-              <h3 className="text-sm font-medium text-foreground mb-2">Size: <span className="font-semibold">{selectedSize}</span></h3>
+              <h3 className="text-sm font-medium text-foreground mb-2">Available Sizes:</h3>
               <div className="flex flex-wrap gap-2">
                 {product.sizes.map(size => (
-                  <Button
-                    key={size}
-                    variant={selectedSize === size ? "default" : "outline"}
-                    onClick={() => setSelectedSize(size)}
-                    className="px-4"
-                  >
+                  <span key={size} className="p-1 px-3 text-xs border rounded-md bg-muted">
                     {size}
-                  </Button>
+                  </span>
                 ))}
               </div>
             </div>
@@ -172,19 +100,8 @@ export default function ProductDetailPage() {
           <Separator />
 
           <div className="flex flex-col sm:flex-row gap-4">
-            <Button size="lg" onClick={handleAddToCart} className="flex-1 bg-primary hover:bg-primary/90" disabled={authLoading}>
-              <ShoppingCart className="mr-2 h-5 w-5" /> Add to Cart
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              onClick={handleWishlistToggle}
-              className={`flex-1 ${isInWishlist(product.id) ? 'text-destructive border-destructive hover:text-destructive' : ''}`}
-              disabled={authLoading}
-            >
-              <Heart className={`mr-2 h-5 w-5 ${isInWishlist(product.id) ? 'fill-current' : ''}`} /> 
-              {isInWishlist(product.id) ? 'Remove from Wishlist' : 'Add to Wishlist'}
-            </Button>
+            <AddToCartButton product={product} />
+            <WishlistToggleButton product={product} />
           </div>
 
           <Accordion type="single" collapsible className="w-full">
@@ -195,6 +112,7 @@ export default function ProductDetailPage() {
                   {product.details?.map((detail, index) => <li key={index}>{detail}</li>)}
                   {product.sku && <li>SKU: {product.sku}</li>}
                   {product.category && <li>Category: {product.category}</li>}
+                  {product.subCategory && <li>Sub-Category: {product.subCategory}</li>}
                 </ul>
               </AccordionContent>
             </AccordionItem>
@@ -207,7 +125,6 @@ export default function ProductDetailPage() {
               </AccordionContent>
             </AccordionItem>
           </Accordion>
-
         </div>
       </div>
       
@@ -219,7 +136,7 @@ export default function ProductDetailPage() {
         </TabsList>
         <TabsContent value="description" className="prose max-w-none text-foreground/80 p-4 bg-card rounded-lg shadow">
           <p>{product.description}</p>
-          {product.details && (
+          {product.details && product.details.length > 0 && (
             <>
               <h4 className="font-serif mt-4">Key Features:</h4>
               <ul>
@@ -231,7 +148,7 @@ export default function ProductDetailPage() {
           )}
         </TabsContent>
         <TabsContent value="reviews" className="p-4 bg-card rounded-lg shadow">
-          <p className="text-muted-foreground">Customer reviews will be displayed here.</p>
+          <p className="text-muted-foreground">Customer reviews will be displayed here. (Coming Soon)</p>
         </TabsContent>
         <TabsContent value="care" className="p-4 bg-card rounded-lg shadow">
           <p className="text-muted-foreground">Care instructions for this product will be displayed here. Typically: {product.details?.find(d => d.toLowerCase().includes('clean') || d.toLowerCase().includes('wash')) || 'Follow label instructions.'}</p>

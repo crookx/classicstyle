@@ -2,27 +2,29 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+// Card components are not directly used here for sections, but ProductCard and CollectionCard use them.
 import ProductCard from '@/components/product/ProductCard';
 import CollectionCard from '@/components/collections/CollectionCard';
-import ProductRecommendations from '@/components/product/ProductRecommendations';
-import { mockProducts, mockCollections } from '@/data/mock-data';
+import ProductRecommendations from '@/components/product/ProductRecommendations'; // This will also need to fetch from Firestore
+import { getFeaturedProducts, getCollections } from '@/lib/firebase/firestoreService';
+import type { Product, Collection } from '@/types';
 import { ArrowRight } from 'lucide-react';
 
-export default function HomePage() {
-  const featuredProducts = mockProducts.filter(p => p.tags?.includes('featured')).slice(0, 6);
-  const displayedCollections = mockCollections.slice(0, 3);
+export default async function HomePage() {
+  // Fetch data from Firestore
+  const featuredProducts: Product[] = await getFeaturedProducts(6);
+  const displayedCollections: Collection[] = await getCollections(3);
 
   return (
     <div className="space-y-16">
       {/* Hero Section */}
       <section className="relative h-[60vh] min-h-[400px] max-h-[700px] rounded-xl overflow-hidden shadow-2xl">
         <Image
-          src="https://placehold.co/1600x900.png"
+          src="https://placehold.co/1600x900.png" // Replace with a relevant hero image
           alt="Elegant fashion model"
-          fill // Changed from layout="fill"
-          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" // Added sizes for responsiveness with fill
-          style={{objectFit: "cover"}} // Changed from objectFit="cover"
+          fill
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 1500px"
+          style={{objectFit: "cover"}}
           className="brightness-75"
           data-ai-hint="fashion model editorial"
           priority
@@ -53,9 +55,9 @@ export default function HomePage() {
           </Link>
         </div>
         {featuredProducts.length > 0 ? (
-          <div className="flex overflow-x-auto space-x-6 pb-4 -mx-4 px-4"> {/* Horizontal scroll container */}
+          <div className="flex overflow-x-auto space-x-6 pb-4 -mx-4 px-4">
             {featuredProducts.map((product) => (
-              <div key={product.id} className="min-w-[280px] w-72 sm:w-80 flex-shrink-0"> {/* Product card wrapper for consistent width */}
+              <div key={product.id} className="min-w-[280px] w-72 sm:w-80 flex-shrink-0">
                 <ProductCard product={product} />
               </div>
             ))}
@@ -76,11 +78,15 @@ export default function HomePage() {
                 </Button>
             </Link>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {displayedCollections.map((collection) => (
-              <CollectionCard key={collection.id} collection={collection} />
-            ))}
-          </div>
+          {displayedCollections.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {displayedCollections.map((collection) => (
+                <CollectionCard key={collection.id} collection={collection} />
+              ))}
+            </div>
+          ) : (
+             <p className="text-center text-muted-foreground py-8">No collections available at the moment.</p>
+          )}
         </div>
       </section>
 
