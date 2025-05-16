@@ -7,7 +7,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { SiteLogo } from '@/components/layout/SiteLogo';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button'; // Added missing import
+import { Button } from '@/components/ui/button';
 import {
   LayoutDashboard,
   Package,
@@ -19,7 +19,7 @@ import {
   BarChart3,
   Settings,
   Search,
-  ShieldAlert, // For unauthorized message
+  ShieldAlert,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -52,8 +52,6 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!loading && currentUser) {
-      // Manually refresh token to ensure claims are up-to-date after login
-      // This helps if claims were set just before login
       refreshAuthToken();
     }
   }, [currentUser, loading, refreshAuthToken]);
@@ -63,8 +61,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     if (!loading) {
       if (!currentUser) {
         router.push(`/login?redirect=${pathname}`);
-      } else if (isAdmin === false) { // Explicitly check for false after loading isAdmin status
-        // Don't redirect if isAdmin is null (still loading claims)
+      } else if (isAdmin === false) { 
         // Only redirect if definitely not an admin
       }
     }
@@ -81,7 +78,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     }
   };
 
-  if (loading || isAdmin === null) { // Also wait for isAdmin to be determined
+  if (loading || isAdmin === null) { 
     return (
       <div className="flex items-center justify-center h-screen bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -91,7 +88,6 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   }
 
   if (!currentUser) {
-     // This case should be caught by the useEffect, but as a fallback:
     return (
       <div className="flex items-center justify-center h-screen bg-background">
         <p className="text-muted-foreground">Redirecting to login...</p>
@@ -123,7 +119,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       <Sidebar collapsible="icon" className="border-r border-border/70">
         <SidebarHeader className="p-4 border-b border-border/70">
           <div className="flex items-center gap-2">
-            <SiteLogo />
+            <SiteLogo /> {/* Use SiteLogo component */}
             <span className="font-semibold text-lg group-data-[collapsible=icon]:hidden">Admin</span>
           </div>
         </SidebarHeader>
@@ -176,9 +172,10 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               type="search"
               placeholder="Search products, orders, customers..."
               className="w-full rounded-lg bg-muted pl-8 md:w-[300px] lg:w-[400px] h-9 shadow-none"
-              disabled
+              disabled // Search is a placeholder for now
             />
           </div>
+          {/* Placeholder for user avatar or name in admin header if needed */}
         </header>
         <main className="flex-1 p-6 md:p-8 overflow-auto">
           {children}

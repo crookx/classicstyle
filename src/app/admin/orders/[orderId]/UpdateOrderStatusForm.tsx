@@ -24,10 +24,24 @@ export default function UpdateOrderStatusForm({ orderId, currentStatus }: Update
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (selectedStatus === currentStatus) {
+        toast({
+            title: 'No Change',
+            description: 'The new status is the same as the current status.',
+            variant: 'default'
+        });
+        return;
+    }
     startTransition(async () => {
       const formData = new FormData();
       formData.append('orderId', orderId);
       formData.append('status', selectedStatus);
+
+      // Log formData for debugging
+      // console.log("FormData to be sent:", {
+      //   orderId: formData.get('orderId'),
+      //   status: formData.get('status'),
+      // });
 
       const result = await updateOrderStatusAction(formData);
       if (result.success) {
@@ -36,7 +50,6 @@ export default function UpdateOrderStatusForm({ orderId, currentStatus }: Update
           description: `Order ${orderId} status changed to ${selectedStatus}.`,
         });
         // The page should revalidate due to revalidatePath in the server action.
-        // router.refresh() could be used if not for server action revalidation.
       } else {
         toast({
           title: 'Error Updating Status',

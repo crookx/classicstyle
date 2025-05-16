@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Users, MoreVertical, Mail, ShoppingBag, UserCircle, AlertTriangle, Loader2 } from "lucide-react";
+import { Users, MoreVertical, Mail, ShoppingBag, UserCircle, AlertTriangle, Loader2, PlusCircle } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -13,21 +13,26 @@ import type { UserProfile } from '@/types';
 import { format } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 export default function AdminCustomersPage() {
   const [customers, setCustomers] = useState<UserProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { currentUser, loading: authLoading } = useAuth();
+  const { currentUser, isAdmin, loading: authLoading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!authLoading && !currentUser) {
-      router.push('/login?redirect=/admin/customers');
-      return;
+    if (!authLoading) {
+      if (!currentUser || isAdmin === false) {
+        router.push('/login?redirect=/admin/customers');
+        return;
+      }
     }
+  }, [currentUser, isAdmin, authLoading, router]);
 
-    if (currentUser) {
+  useEffect(() => {
+    if (currentUser && isAdmin) {
       const loadCustomers = async () => {
         setIsLoading(true);
         setError(null);
@@ -42,8 +47,15 @@ export default function AdminCustomersPage() {
         }
       };
       loadCustomers();
+    } else if (!authLoading && currentUser && isAdmin === false) {
+        // Non-admin user, handled by outer useEffect, but set loading false if it runs
+        setIsLoading(false);
+    } else if (!authLoading && !currentUser) {
+        // No user, handled by outer useEffect
+        setIsLoading(false);
     }
-  }, [currentUser, authLoading, router]);
+
+  }, [currentUser, isAdmin, authLoading]);
 
   if (authLoading || isLoading) {
     return (
@@ -61,9 +73,11 @@ export default function AdminCustomersPage() {
           <h1 className="text-3xl font-serif font-bold">Manage Customers</h1>
           <p className="text-muted-foreground">View customer profiles from Firestore.</p>
         </div>
-         <Button disabled> 
-            <Users className="mr-2 h-5 w-5" /> Add New Customer (Coming Soon)
-        </Button>
+         <Link href="/admin/customers/new">
+            <Button> 
+                <PlusCircle className="mr-2 h-5 w-5" /> Add New Customer
+            </Button>
+        </Link>
       </div>
       <Card className="shadow-xl rounded-xl">
         <CardHeader>
@@ -110,7 +124,8 @@ export default function AdminCustomersPage() {
                     <TableCell className="text-right">
                        <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" disabled> 
+                          {/* Removed disabled from Button to make the trigger clickable */}
+                          <Button variant="ghost" size="icon"> 
                             <MoreVertical className="h-4 w-4" />
                              <span className="sr-only">Customer Actions</span>
                           </Button>
@@ -132,6 +147,7 @@ export default function AdminCustomersPage() {
                 <Users className="h-16 w-16 mx-auto mb-4 opacity-50" />
                 <p className="text-lg">No customers found.</p>
                 <p>New users will appear here after they sign up.</p>
+                <p className="mt-2 text-sm">If you have recently added users, ensure your Firestore permissions allow listing for admins.</p>
             </div>
             )
           )}
