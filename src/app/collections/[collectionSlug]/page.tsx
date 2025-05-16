@@ -13,7 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Slider } from '@/components/ui/slider';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Filter } from 'lucide-react';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet'; // Added SheetHeader, SheetTitle
+import Link from 'next/link';
 
 export default function CollectionDetailPage() {
   const params = useParams();
@@ -56,7 +57,7 @@ export default function CollectionDetailPage() {
     if (searchTerm) {
       tempProducts = tempProducts.filter(p =>
         p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (p.description && p.description.toLowerCase().includes(searchTerm.toLowerCase())) || // Added check for p.description
         p.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
       );
     }
@@ -78,9 +79,8 @@ export default function CollectionDetailPage() {
       case 'name-desc':
         tempProducts.sort((a, b) => b.name.localeCompare(a.name));
         break;
-      case 'featured': // Assuming 'featured' products might be first or based on specific logic
+      case 'featured': 
       default:
-        // Could add a specific 'featured' sorting if products have an order property
         tempProducts.sort((a,b) => (b.tags?.includes('featured') ? 1 : 0) - (a.tags?.includes('featured') ? 1 : 0) );
         break;
     }
@@ -92,11 +92,9 @@ export default function CollectionDetailPage() {
   }, [processedProducts]);
 
   const FiltersContent = () => (
-    <Card className="shadow-lg rounded-xl sticky top-24">
-      <CardHeader>
-        <CardTitle className="text-xl font-serif">Filters</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
+    <Card className="shadow-lg rounded-xl border-none"> {/* Removed border */}
+       {/* CardHeader is removed from here as SheetHeader will provide the title */}
+      <CardContent className="space-y-6 pt-6"> {/* Added pt-6 as CardHeader is removed */}
         <div>
           <Label htmlFor="search-collection" className="text-base font-medium">Search in Collection</Label>
           <Input
@@ -134,7 +132,7 @@ export default function CollectionDetailPage() {
     </Card>
   );
 
-  if (!collection && baseProducts.length === 0) { // Check baseProducts as well to avoid flash of loading
+  if (!collection && baseProducts.length === 0 && collectionSlug) { 
     return (
       <div className="container mx-auto px-4 py-12 text-center">
         <h1 className="text-2xl font-semibold">Loading collection...</h1>
@@ -181,7 +179,47 @@ export default function CollectionDetailPage() {
       <div className="flex flex-col md:flex-row gap-8">
         {/* Filters Sidebar - Desktop */}
         <aside className="hidden md:block md:w-1/4 lg:w-1/5 space-y-6">
-          <FiltersContent />
+          <Card className="shadow-lg rounded-xl sticky top-24">
+             <CardHeader>
+                <CardTitle className="text-xl font-serif">Filters</CardTitle>
+            </CardHeader>
+            {/* Content of filters moved into its own card for desktop */}
+            <CardContent className="space-y-6">
+              <div>
+                <Label htmlFor="search-collection-desktop" className="text-base font-medium">Search in Collection</Label>
+                <Input
+                  id="search-collection-desktop"
+                  type="text"
+                  placeholder="Search products..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <h3 className="text-base font-medium mb-2">Price Range</h3>
+                <Slider
+                  min={0}
+                  max={maxPossiblePrice}
+                  step={10}
+                  value={priceRange}
+                  onValueChange={(value) => setPriceRange(value as [number, number])}
+                  className="mt-1"
+                />
+                <div className="flex justify-between text-sm text-muted-foreground mt-2">
+                  <span>${priceRange[0]}</span>
+                  <span>${maxPossiblePrice > 0 ? priceRange[1] : 'N/A'}</span>
+                </div>
+              </div>
+              <Button onClick={() => {
+                  setSearchTerm('');
+                  setPriceRange([0, maxPossiblePrice]);
+                  setSortBy('featured');
+              }} variant="outline" className="w-full">
+                  Clear All Filters
+              </Button>
+            </CardContent>
+          </Card>
         </aside>
 
         {/* Products Grid */}
@@ -198,6 +236,9 @@ export default function CollectionDetailPage() {
                   </Button>
                 </SheetTrigger>
                 <SheetContent side="left" className="w-[300px] overflow-y-auto p-0">
+                  <SheetHeader className="p-4 border-b">
+                    <SheetTitle>Filters</SheetTitle>
+                  </SheetHeader>
                    <div className="p-4 h-full"><FiltersContent/></div>
                 </SheetContent>
               </Sheet>

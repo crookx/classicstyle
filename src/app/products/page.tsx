@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import ProductGrid from '@/components/product/ProductGrid';
@@ -11,7 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Slider } from '@/components/ui/slider';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Filter, X } from 'lucide-react';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet'; // Added SheetHeader, SheetTitle
 
 const allCategories = Array.from(new Set(mockProducts.map(p => p.category).filter(Boolean))) as string[];
 const maxPrice = Math.max(...mockProducts.map(p => p.price));
@@ -62,6 +63,7 @@ export default function ProductsPage() {
       case 'featured':
       default:
         // No specific sort for featured, could be based on an order property or default
+        tempProducts.sort((a,b) => (b.tags?.includes('featured') ? 1 : 0) - (a.tags?.includes('featured') ? 1 : 0) );
         break;
     }
     return tempProducts;
@@ -79,11 +81,9 @@ export default function ProductsPage() {
   };
 
   const FiltersContent = () => (
-    <Card className="shadow-lg rounded-xl">
-      <CardHeader>
-        <CardTitle className="text-xl font-serif">Filters</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
+    <Card className="shadow-lg rounded-xl border-none"> {/* Removed border as sheet will handle it */}
+      {/* CardHeader is removed from here as SheetHeader will provide the title */}
+      <CardContent className="space-y-6 pt-6"> {/* Added pt-6 as CardHeader is removed */}
         <div>
           <Label htmlFor="search" className="text-base font-medium">Search</Label>
           <Input
@@ -147,7 +147,63 @@ export default function ProductsPage() {
       <div className="flex flex-col md:flex-row gap-8">
         {/* Filters Sidebar - Desktop */}
         <aside className="hidden md:block md:w-1/4 lg:w-1/5 space-y-6">
-          <FiltersContent />
+          <Card className="shadow-lg rounded-xl sticky top-24">
+             <CardHeader>
+                <CardTitle className="text-xl font-serif">Filters</CardTitle>
+            </CardHeader>
+            {/* Content of filters moved into its own card for desktop */}
+            <CardContent className="space-y-6">
+              <div>
+                <Label htmlFor="search-desktop" className="text-base font-medium">Search</Label>
+                <Input
+                  id="search-desktop"
+                  type="text"
+                  placeholder="Search products..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <h3 className="text-base font-medium mb-2">Category</h3>
+                <div className="space-y-2">
+                  {allCategories.map(category => (
+                    <div key={category} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`category-desktop-${category}`}
+                        checked={selectedCategories.includes(category)}
+                        onCheckedChange={() => handleCategoryChange(category)}
+                      />
+                      <Label htmlFor={`category-desktop-${category}`} className="font-normal">{category}</Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <h3 className="text-base font-medium mb-2">Price Range</h3>
+                <Slider
+                  min={0}
+                  max={maxPrice}
+                  step={10}
+                  value={priceRange}
+                  onValueChange={(value) => setPriceRange(value as [number, number])}
+                  className="mt-1"
+                />
+                <div className="flex justify-between text-sm text-muted-foreground mt-2">
+                  <span>${priceRange[0]}</span>
+                  <span>${priceRange[1]}</span>
+                </div>
+              </div>
+              <Button onClick={() => {
+                  setSearchTerm('');
+                  setSelectedCategories([]);
+                  setPriceRange([0, maxPrice]);
+                  setSortBy('featured');
+              }} variant="outline" className="w-full">
+                  Clear All Filters
+              </Button>
+            </CardContent>
+          </Card>
         </aside>
 
         {/* Products Grid */}
@@ -164,7 +220,10 @@ export default function ProductsPage() {
                   </Button>
                 </SheetTrigger>
                 <SheetContent side="left" className="w-[300px] overflow-y-auto p-0">
-                   <div className="p-4 h-full"><FiltersContent/></div>
+                  <SheetHeader className="p-4 border-b">
+                    <SheetTitle>Filters</SheetTitle>
+                  </SheetHeader>
+                  <div className="p-4 h-full"><FiltersContent/></div>
                 </SheetContent>
               </Sheet>
             </div>

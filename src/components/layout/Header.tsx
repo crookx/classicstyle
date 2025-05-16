@@ -7,7 +7,7 @@ import { Heart, ShoppingCart, User, Search, Menu, LogIn, LogOut, ShieldCheck } f
 import { useCart } from '@/contexts/CartContext';
 import { useWishlist } from '@/contexts/WishlistContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet'; // Added SheetHeader, SheetTitle
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
@@ -128,10 +128,11 @@ export default function Header() {
                 </Button>
               </SheetTrigger>
               <SheetContent side="right" className="w-[280px] bg-background p-0 flex flex-col">
-                <div className="p-6">
+                <SheetHeader className="p-6 border-b">
                   <SiteLogo />
-                </div>
-                <Separator />
+                  <SheetTitle className="sr-only">Main Menu</SheetTitle>
+                </SheetHeader>
+                
                 <nav className="flex-grow p-6 space-y-3">
                   {navLinks.map((link) => (
                     <Link
